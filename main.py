@@ -2,6 +2,7 @@ import os
 import torch
 import json
 import argparse
+from kewen.IF_project.fenchel import fenchel_calc
 
 from src.utils import save_json
 from src.dataset import return_data
@@ -20,6 +21,8 @@ def main(args):
         influences, harmful, helpful = tracin_cp(args.ckpt_dir, x_test, y_test, train_loader, device)
     elif args.method == 'hvp':
          influences, harmful, helpful = calc_influence_single(args.ckpt_dir, x_test, y_test, train_loader, device, args.recursion_depth, args.r_averaging)
+    elif args.method == 'fenchel':
+         influences, harmful, helpful = fenchel(args.ckpt_dir, x_test, y_test, train_loader, device, args.recursion_depth, args.r_averaging)
     else:
         raise NotImplementedError()
     
@@ -39,7 +42,7 @@ if __name__ == "__main__":
     parser.add_argument('--ckpt_iter', type=int, default=1500000, help='checkpoint iteration')
 
     # dataset
-    parser.add_argument('--method', type=str, default="hvp", help="use tracIn or hvp")
+    parser.add_argument('--method', type=str, default="fenchel", help="use tracIn or hvp or fenchel")
     parser.add_argument('--batch_size', type=int, default=64, help="batch_size")
     
     # Target

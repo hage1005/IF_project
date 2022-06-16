@@ -21,8 +21,7 @@ def main(args):
         influences, harmful, helpful = tracin_cp(args.ckpt_dir, x_test, y_test, train_loader, device)
     elif args.method == 'hvp':
          influences, harmful, helpful = calc_influence_single(args.ckpt_dir, x_test, y_test, train_loader, device, args.recursion_depth, args.r_averaging)
-    elif args.method == 'fenchel':
-         influences, harmful, helpful = fenchel(args.ckpt_dir, x_test, y_test, train_loader, device, args.recursion_depth, args.r_averaging)
+
     else:
         raise NotImplementedError()
     

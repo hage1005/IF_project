@@ -17,12 +17,12 @@ EPSILON = 1e-5
 
 
 class ImageClassifier:
-    def __init__(self, x_test, y_test, pretrained=True,
+    def __init__(self, x_test, y_test, model, influence_model, pretrained=True,
                  baseline=False, softmax_temp=1.):
                  
-        self._influence_model = Net(out_dim=1).to('cuda')
+        self._influence_model = influence_model
         # self._model = models.resnet34(pretrained=pretrained).to('cuda')
-        self._model = Net(out_dim=10).to('cuda')
+        self._model = model
 
         self._optimizer_theta3 = None
 
@@ -37,6 +37,7 @@ class ImageClassifier:
         self._softmax_temp = softmax_temp
 
         self.global_iter = 0
+        self.global_epoch = 0
 
         self.x_test = x_test.to('cuda')
         self.y_test = y_test.to('cuda')
@@ -69,6 +70,7 @@ class ImageClassifier:
         self.train_epoch(is_pretrain=True)
 
     def train_epoch(self, is_pretrain=False):
+        self.global_epoch += 1
         criterion = nn.CrossEntropyLoss(reduction='none')
         pbar = tqdm(self._data_loader['train'], desc='Training Epoch')
 
@@ -76,6 +78,12 @@ class ImageClassifier:
             inputs, labels, ids = tuple(t.to('cuda') for t in batch)
             self.global_iter += 1
             
+            weights= self._weights[ids].detach()
+            self._optimizer_theta1.zero_grad()
+            loss_F = - torch.sum(torch.mean( self._influence_model(inputs) - self._influence_model(inputs).flatten() * weights))
+            loss_F.backward() #theta 1 update, todo: does weights change?
+            self._optimizer_theta1.step()
+
             if is_pretrain:
                 weights = linear_normalize(
                     torch.ones(inputs.shape[0]).to('cuda'))
@@ -84,15 +92,6 @@ class ImageClassifier:
                     self._get_weights(batch),
                     temperature=self._softmax_temp) #theta 2 update
 
-            self._influence_model.train()
-            self._model.eval()
-            self._optimizer_theta1.zero_grad()
-            loss_F = - torch.sum(self._influence_model(inputs).flatten() * weights) - torch.mean(self._influence_model(inputs))
-            loss_F.backward() #theta 1 update
-            self._optimizer_theta1.step()
-
-            self._model.train()
-            self._influence_model.eval()
             self._optimizer_theta3.zero_grad()
             logits = self._model(inputs)
             loss = criterion(logits, labels)
@@ -155,16 +154,16 @@ class ImageClassifier:
 
         if weights.grad is not None:
             weights.grad.zero_()
-        train_logits = magic_model(self.x_test) #this part is magic_module
-        train_loss = criterion(train_logits, self.y_test) #the third term
-        train_loss = torch.mean(self._influence_model(train_inputs) * weights) - train_loss # the inf term
-        # train_loss = train_loss * float(batch_size) / float(
+        test_logits = magic_model(self.x_test) #this part is magic_module
+        test_loss = criterion(test_logits, self.y_test.long()) #the third term
+        test_loss = test_loss - torch.sum(self._influence_model(train_inputs) * weights)  # the inf term, sum? todo: check this
+        # test_loss = test_loss * float(batch_size) / float(
         #     len(self._dataset['dev'])) #not using dev but train batch
 
         weights_grad = torch.autograd.grad(
-            train_loss, weights, retain_graph=True)[0]
+            test_loss, weights, retain_graph=True)[0]
         weights_grad_list.append(weights_grad)
-
+#       weight_grad += self._influence_model(train_inputs)
         weights_grad = sum(weights_grad_list)
 
         self._weights[ids] = weights.data / self._w_decay - weights_grad

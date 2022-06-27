@@ -80,7 +80,9 @@ class ImageClassifier:
             
             weights= self._weights[ids].detach()
             self._optimizer_theta1.zero_grad()
-            loss_F = - torch.sum(torch.mean( self._influence_model(inputs) - self._influence_model(inputs).flatten() * weights))
+            # concatenate inputs and labels
+            # inputs_labels = torch.cat([inputs, labels.unsqueeze(1)], dim=1)
+            loss_F = - torch.sum(torch.mean( self._influence_model(inputs, labels) - self._influence_model(inputs, labels).flatten() * weights))
             loss_F.backward() #theta 1 update, todo: does weights change?
             self._optimizer_theta1.step()
 
@@ -93,11 +95,21 @@ class ImageClassifier:
                     temperature=self._softmax_temp) #theta 2 update
 
             self._optimizer_theta3.zero_grad()
-            logits = self._model(inputs)
-            loss = criterion(logits, labels)
-            loss = torch.sum(loss * weights.data)
-            loss.backward() #theta 3 update
-            self._optimizer_theta3.step()
+            lossHistory = []
+            while 1:
+                logits = self._model(inputs)
+                loss = criterion(logits, labels)
+                loss = torch.sum(loss * weights.data)
+                loss.backward() #theta 3 update
+                self._optimizer_theta3.step()
+                lossHistory.append(loss)
+                if loss.isnan():
+                    break
+                # compare the variance of last 5 loss
+                if len(lossHistory) > 5:
+                    if torch.var(torch.stack(lossHistory[-5:])).item() < 0.1:
+                        break
+                    
 
             if self.global_iter % 200 == 0:
                 pbar.write('[{}] loss_F: {:.3f}, loss: {:.3F} '.format(
@@ -156,20 +168,32 @@ class ImageClassifier:
             weights.grad.zero_()
         test_logits = magic_model(self.x_test) #this part is magic_module
         test_loss = criterion(test_logits, self.y_test.long()) #the third term
-        test_loss = test_loss - torch.sum(self._influence_model(train_inputs) * weights)  # the inf term, sum? todo: check this
+        # inputs_labels = torch.cat([train_inputs, train_labels.unsqueeze(1)], dim=1)
+        weights = softmax_normalize(
+                    weights,
+                    temperature=self._softmax_temp)
+        infTerm = test_loss - torch.sum(self._influence_model(inputs,labels).squeeze().detach() * weights)  # the inf term, sum? todo: check this
+        print("infTerm", infTerm)
         # test_loss = test_loss * float(batch_size) / float(
         #     len(self._dataset['dev'])) #not using dev but train batch
 
         weights_grad = torch.autograd.grad(
-            test_loss, weights, retain_graph=True)[0]
+            infTerm, weights, retain_graph=True)[0]
         weights_grad_list.append(weights_grad)
 #       weight_grad += self._influence_model(train_inputs)
         weights_grad = sum(weights_grad_list)
 
+        # weights_grad = min(weights_grad, torch.ones_like(weights_grad))
+        # weights_gard = max(weights_grad, -torch.ones_like(weights_grad))
+
+        print("weights_grad_avg ", sum(weights_grad) / len(weights_grad_list))
+
         self._weights[ids] = weights.data / self._w_decay - weights_grad
         self._weights[ids] = torch.max(self._weights[ids], torch.ones_like(
             self._weights[ids]).fill_(EPSILON))
-
+        
+        if self._weights[ids].data[0] == torch.inf or self._weights[ids].data[0].isnan():
+            self._weights[ids] = torch.zeros_like(self._weights[ids])
         return self._weights[ids].data
 
     def evaluate(self, set_type):

@@ -11,20 +11,21 @@ from torch.utils.data import TensorDataset, DataLoader
 from torchvision import models
 from src.dataset import return_data
 from src.fenchel_classifier import ImageClassifier
-from src.model import Net
+from src.model import Net, Net_influence
 from src.magic_module import MagicModule
 
 EPSILON = 1e-5
 
 def main(args):
-    train_loader, test_loader = return_data(args.batch_size)
+    train_loader, test_loader = return_data(args.batch_size, "cifar10")
     x_test, y_test = test_loader.dataset[args.test_id_num]
     x_test, y_test = test_loader.collate_fn([x_test]), test_loader.collate_fn([y_test])
-    model = Net(out_dim=10).to('cuda')
-    influence_model = Net(out_dim=1).to('cuda')
+    num_class = 10
+    model = Net(out_dim=num_class).to('cuda')
+    influence_model = Net_influence(1, num_class).to('cuda')
     fenchen_classifier = ImageClassifier(x_test, y_test, model, influence_model)
 
-    fenchen_classifier.load_data("train", train_loader.dataset, args.batch_size, shuffle=False)
+    fenchen_classifier.load_data("train", train_loader.dataset, args.batch_size, shuffle=True)
     fenchen_classifier.load_data("test", test_loader.dataset, args.batch_size, shuffle=False)
     
 

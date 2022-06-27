@@ -11,6 +11,10 @@ Then Run main.py to compute IF
     - see https://github.com/ryokamoi/pytorch_influence_functions/issues/2
 
 ## Debug commands
+x = torch.cuda.FloatTensor([[-1],[0],[1],[-1],[0],[1]])
+y = torch.cuda.LongTensor([0,0,0,1,1,1])
+self._influence_model(x,y)
+
 import numpy as np
 idx = np.argwhere(train_labels.cpu() == 3)
 self._influence_model(train_inputs, train_labels)[idx]

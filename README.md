@@ -9,3 +9,9 @@ Then Run main.py to compute IF
 ## problemswith  Hvp
 - r, recursion_depth, scale, damp in hvp_grad need to be fixed
     - see https://github.com/ryokamoi/pytorch_influence_functions/issues/2
+
+## Debug commands
+import numpy as np
+idx = np.argwhere(train_labels.cpu() == 3)
+self._influence_model(train_inputs, train_labels)[idx]
+np.where(self._influence_model(train_inputs, train_labels).squeeze().cpu() > 0.2)

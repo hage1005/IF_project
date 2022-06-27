@@ -78,11 +78,14 @@ class ImageClassifier:
             inputs, labels, ids = tuple(t.to('cuda') for t in batch)
             self.global_iter += 1
             
-            weights= self._weights[ids].detach()
+            weights= softmax_normalize(
+                self._weights[ids].detach(),
+                temperature=self._softmax_temp)
             self._optimizer_theta1.zero_grad()
             # concatenate inputs and labels
             # inputs_labels = torch.cat([inputs, labels.unsqueeze(1)], dim=1)
             loss_F = - torch.sum(torch.mean( self._influence_model(inputs, labels) - self._influence_model(inputs, labels).flatten() * weights))
+            loss_F = torch.log(loss_F+10) 
             loss_F.backward() #theta 1 update, todo: does weights change?
             self._optimizer_theta1.step()
 
@@ -115,14 +118,15 @@ class ImageClassifier:
                 pbar.write('[{}] loss_F: {:.3f}, loss: {:.3F} '.format(
                             self.global_iter, loss_F, loss))
 
-    def _get_weights(self, batch): # batch is from train set
+    def _get_weights(self, batch, no_update = False): # batch is from train set
         self._model.eval()
 
         inputs, labels, ids = tuple(t.to('cuda') for t in batch)
         batch_size = inputs.shape[0]
 
         weights = self._weights[ids]
-
+        if no_update:
+            return weights
         magic_model = MagicModule(self._model)
         criterion = nn.CrossEntropyLoss()
 
@@ -158,6 +162,7 @@ class ImageClassifier:
                 deltas[name] = weights[i] * (param_tmp.data - param.data)
             magic_model.update_params(deltas) #theta prime, make it the same as model_tmp
 
+        # TODO remove this
         weights_grad_list = []
         # for step, batch in enumerate(self._data_loader['train']):
         batch = (t.to('cuda') for t in batch)
@@ -183,10 +188,10 @@ class ImageClassifier:
 #       weight_grad += self._influence_model(train_inputs)
         weights_grad = sum(weights_grad_list)
 
-        # weights_grad = min(weights_grad, torch.ones_like(weights_grad))
-        # weights_gard = max(weights_grad, -torch.ones_like(weights_grad))
+        print("weights_grad average before clip", sum(weights_grad) / len(weights_grad))
+        # weights_grad = torch.min(weights_grad, torch.ones_like(weights_grad))
+        # weights_grad = torch.max(weights_grad, -torch.ones_like(weights_grad))
 
-        print("weights_grad_avg ", sum(weights_grad) / len(weights_grad_list))
 
         self._weights[ids] = weights.data / self._w_decay - weights_grad
         self._weights[ids] = torch.max(self._weights[ids], torch.ones_like(

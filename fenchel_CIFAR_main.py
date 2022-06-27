@@ -1,8 +1,10 @@
 import argparse
+import os
 from sklearn.utils import shuffle
 from tqdm import tqdm
 import copy
 
+import numpy as np
 import torch
 from torch import nn
 from torch import optim
@@ -13,6 +15,7 @@ from src.dataset import return_data
 from src.fenchel_classifier import ImageClassifier
 from src.model import Net, Net_influence
 from src.magic_module import MagicModule
+from src.utils import save_json
 
 EPSILON = 1e-5
 
@@ -39,6 +42,22 @@ def main(args):
     for epoch in range(args.max_epoch):
         fenchen_classifier.train_epoch()
         fenchen_classifier.save_checkpoint(args.ckpt_dir + args.ckpt_name)
+        result = {}
+        
+        train_dataset_size = len(train_loader.dataset)
+        influences = [0.0 for _ in range(train_dataset_size)]
+        # TODO compute by batch
+        for i in tqdm(range(train_dataset_size)):
+            x, y = train_loader.dataset[i]
+            influences[i] = influence_model(x.to('cuda').unsqueeze(0), torch.LongTensor([y]).to('cuda').unsqueeze(0))
+        influences = np.array(influences)
+        harmful = np.argsort(influences)
+        helpful = harmful[::-1]
+        result["helpful"] = helpful[:500]
+        result["harmful"] = harmful[:500]
+        result["influence"] = influences
+        json_path = os.path.join(args.output_path, f"IF_test_id_{args.test_id_num}_epoch_{epoch}.json")
+        save_json(result, json_path)
 
 
 
@@ -66,6 +85,8 @@ if __name__ == "__main__":
     parser.add_argument('--test_id_num', type=int, default=0, help="id of test example in testloader")
     args = parser.parse_args()
 
+    # Output
+    parser.add_argument('--output_path', type=str, default="../outputs", help="where to put images")
     # Target
 
     main(args)

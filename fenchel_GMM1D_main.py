@@ -1,4 +1,6 @@
 import argparse
+import os
+import numpy as np
 from sklearn.utils import shuffle
 from tqdm import tqdm
 import copy
@@ -9,6 +11,7 @@ from torch import optim
 from torch.utils.data import TensorDataset, DataLoader
 
 from torchvision import models
+from src.utils import save_json
 from src.dataset import return_data
 from src.fenchel_classifier import ImageClassifier
 
@@ -42,6 +45,22 @@ def main(args):
     for epoch in range(args.max_epoch):
         fenchen_classifier.train_epoch()
         fenchen_classifier.save_checkpoint(args.ckpt_dir + args.ckpt_name)
+        
+        result = {}
+        train_dataset_size = len(train_loader.dataset)
+        influences = [0.0 for _ in range(train_dataset_size)]
+        # TODO compute by batch
+        for i in tqdm(range(train_dataset_size)):
+            x, y = train_loader.dataset[i]
+            influences[i] = influence_model(torch.cuda.FloatTensor([x.item()]).unsqueeze(0),torch.cuda.LongTensor([y.item()])).cpu().item()
+        influences = np.array(influences)
+        harmful = np.argsort(influences)
+        helpful = harmful[::-1]
+        result["helpful"] = helpful[:500].tolist()
+        result["harmful"] = harmful[:500].tolist()
+        result["influence"] = influences.tolist()
+        json_path = os.path.join(args.output_path, f"IF_GMM1D_testid_{args.test_id_num}_epoch_{epoch}.json")
+        save_json(result, json_path)
 
 
 
@@ -50,7 +69,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--seed', default=1, type=int, help='random seed')
     parser.add_argument('--gpu', default=1, type=int, help='gpu index')
-    parser.add_argument('--max_epoch', default=100, type=float, help='maximum training epoch')
+    parser.add_argument('--max_epoch', default=10, type=float, help='maximum training epoch')
     parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
     parser.add_argument('--ckpt_dir', default='../checkpoints/fenchel/', type=str, help='checkpoint directory')
     parser.add_argument('--ckpt_name', default='last', type=str, help='load previous checkpoint. insert checkpoint filename')
@@ -65,6 +84,7 @@ if __name__ == "__main__":
     # weighting
     parser.add_argument("--w_decay", default=10., type=float)
     parser.add_argument("--w_init", default=0., type=float)
+    parser.add_argument('--output_path', type=str, default="../outputs/GMM1D", help="where to put images")
 
     parser.add_argument('--test_id_num', type=int, default=1, help="id of test example in testloader, 0 is [-1,0], 1 is [1,1]")
     args = parser.parse_args()

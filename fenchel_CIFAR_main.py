@@ -24,7 +24,7 @@ def main(args):
     x_test, y_test = test_loader.dataset[args.test_id_num]
     x_test, y_test = test_loader.collate_fn([x_test]), test_loader.collate_fn([y_test])
     num_class = 10
-    model = Net(out_dim=num_class).to('cuda')
+    model = models.resnet34(pretrained=True).to('cuda')
     influence_model = Net_influence(1, num_class).to('cuda')
     fenchen_classifier = ImageClassifier(x_test, y_test, model, influence_model)
 
@@ -49,13 +49,13 @@ def main(args):
         # TODO compute by batch
         for i in tqdm(range(train_dataset_size)):
             x, y = train_loader.dataset[i]
-            influences[i] = influence_model(x.to('cuda').unsqueeze(0), torch.LongTensor([y]).to('cuda').unsqueeze(0))
+            influences[i] = influence_model(x.to('cuda').unsqueeze(0), torch.LongTensor([y]).to('cuda').unsqueeze(0)).cpu().item()
         influences = np.array(influences)
         harmful = np.argsort(influences)
         helpful = harmful[::-1]
-        result["helpful"] = helpful[:500]
-        result["harmful"] = harmful[:500]
-        result["influence"] = influences
+        result["helpful"] = helpful[:500].tolist()
+        result["harmful"] = harmful[:500].tolist()
+        result["influence"] = influences.tolist()
         json_path = os.path.join(args.output_path, f"IF_test_id_{args.test_id_num}_epoch_{epoch}.json")
         save_json(result, json_path)
 
@@ -83,10 +83,11 @@ if __name__ == "__main__":
     parser.add_argument("--w_init", default=0., type=float)
 
     parser.add_argument('--test_id_num', type=int, default=0, help="id of test example in testloader")
-    args = parser.parse_args()
-
     # Output
     parser.add_argument('--output_path', type=str, default="../outputs", help="where to put images")
+    args = parser.parse_args()
+
+
     # Target
 
     main(args)

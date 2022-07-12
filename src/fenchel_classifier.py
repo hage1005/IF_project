@@ -112,6 +112,11 @@ class ImageClassifier:
                 if len(lossHistory) > 5:
                     if torch.var(torch.stack(lossHistory[-5:])).item() < 0.1:
                         break
+            # logits = self._model(inputs)
+            # loss = criterion(logits, labels)
+            # loss = torch.sum(loss * weights.data)
+            # loss.backward() #theta 3 update
+            # self._optimizer_theta3.step()
                     
 
             if self.global_iter % 200 == 0:
@@ -171,6 +176,7 @@ class ImageClassifier:
 
         if weights.grad is not None:
             weights.grad.zero_()
+        magic_model.eval() # batchnorm will give error if we don't do this
         test_logits = magic_model(self.x_test) #this part is magic_module
         test_loss = criterion(test_logits, self.y_test.long()) #the third term
         # inputs_labels = torch.cat([train_inputs, train_labels.unsqueeze(1)], dim=1)

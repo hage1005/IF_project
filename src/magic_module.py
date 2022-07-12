@@ -64,7 +64,7 @@ class MagicModule(nn.Module):
                 self._all_weights]
 
     def _get_abs_string_index(self, idx):
-        assert issubclass(self._type, nn.ModuleList)
+        assert issubclass(self._type, nn.Sequential)
         """Get the absolute index for the list of modules"""
         idx = operator.index(idx)
         if not (-len(self) <= idx < len(self)):
@@ -74,14 +74,14 @@ class MagicModule(nn.Module):
         return str(idx)
 
     def __getitem__(self, idx):
-        assert issubclass(self._type, nn.ModuleList)
+        assert issubclass(self._type, nn.Sequential)
         if isinstance(idx, slice):
             return self.__class__(list(self._modules.values())[idx])
         else:
             return self._modules[self._get_abs_string_index(idx)]
 
     def __len__(self):
-        assert issubclass(self._type, nn.ModuleList)
+        assert issubclass(self._type, nn.Sequential)
         return len(self._modules)
 
     def transpose_for_scores(self, x):

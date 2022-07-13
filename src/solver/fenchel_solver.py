@@ -11,18 +11,17 @@ from torch.utils.data import TensorDataset, DataLoader
 from torchvision import models
 
 from .magic_module import MagicModule
+import wandb
 
-from .model import Net
 EPSILON = 1e-5
 
 
-class ImageClassifier:
-    def __init__(self, x_test, y_test, model, influence_model, pretrained=True,
+class FenchelSolver:
+    def __init__(self, x_test, y_test, classification_model, influence_model, pretrained=True,
                  baseline=False, softmax_temp=1.):
                  
         self._influence_model = influence_model
-        # self._model = models.resnet34(pretrained=pretrained).to('cuda')
-        self._model = model
+        self._classification_model = classification_model
 
         self._optimizer_theta3 = None
 
@@ -60,7 +59,7 @@ class ImageClassifier:
     
     def get_optimizer(self, learning_rate, momentum, weight_decay):
         self._optimizer_theta3 = optim.SGD(
-            self._model.parameters(),
+            self._classification_model.parameters(),
             lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
         self._optimizer_theta1 = optim.SGD(
             self._influence_model.parameters(),
@@ -81,11 +80,13 @@ class ImageClassifier:
             weights= softmax_normalize(
                 self._weights[ids].detach(),
                 temperature=self._softmax_temp)
+
+            weights_varience = torch.var(weights)
+            wandb.log({'weights_varience': weights_varience})
             self._optimizer_theta1.zero_grad()
-            # concatenate inputs and labels
-            # inputs_labels = torch.cat([inputs, labels.unsqueeze(1)], dim=1)
-            loss_F = - torch.sum(torch.mean( self._influence_model(inputs, labels) - self._influence_model(inputs, labels).flatten() * weights))
-            loss_F = torch.log(loss_F+10) 
+
+            loss_F = torch.sum(self._influence_model(inputs, labels).flatten() * weights) - torch.mean( self._influence_model(inputs, labels).flatten() )
+            # loss_F = torch.log(loss_F+10) 
             loss_F.backward() #theta 1 update, todo: does weights change?
             self._optimizer_theta1.step()
 
@@ -100,7 +101,7 @@ class ImageClassifier:
             self._optimizer_theta3.zero_grad()
             lossHistory = []
             while 1:
-                logits = self._model(inputs)
+                logits = self._classification_model(inputs)
                 loss = criterion(logits, labels)
                 loss = torch.sum(loss * weights.data)
                 loss.backward() #theta 3 update
@@ -112,19 +113,15 @@ class ImageClassifier:
                 if len(lossHistory) > 5:
                     if torch.var(torch.stack(lossHistory[-5:])).item() < 0.1:
                         break
-            # logits = self._model(inputs)
-            # loss = criterion(logits, labels)
-            # loss = torch.sum(loss * weights.data)
-            # loss.backward() #theta 3 update
-            # self._optimizer_theta3.step()
                     
-
+            wandb.log({'uniform_minus_weighted_influence': loss_F, 'classification_loss': loss})
             if self.global_iter % 200 == 0:
                 pbar.write('[{}] loss_F: {:.3f}, loss: {:.3F} '.format(
                             self.global_iter, loss_F, loss))
+                
 
     def _get_weights(self, batch, no_update = False): # batch is from train set
-        self._model.eval()
+        self._classification_model.eval()
 
         inputs, labels, ids = tuple(t.to('cuda') for t in batch)
         batch_size = inputs.shape[0]
@@ -132,10 +129,10 @@ class ImageClassifier:
         weights = self._weights[ids]
         if no_update:
             return weights
-        magic_model = MagicModule(self._model)
+        magic_model = MagicModule(self._classification_model)
         criterion = nn.CrossEntropyLoss()
 
-        model_tmp = copy.deepcopy(self._model)
+        model_tmp = copy.deepcopy(self._classification_model)
         optimizer_hparams = self._optimizer_theta3.state_dict()['param_groups'][0]
         optimizer_tmp = optim.SGD(
             model_tmp.parameters(),
@@ -144,7 +141,7 @@ class ImageClassifier:
             weight_decay=optimizer_hparams['weight_decay'])
 
         for i in range(batch_size):
-            model_tmp.load_state_dict(self._model.state_dict())
+            model_tmp.load_state_dict(self._classification_model.state_dict())
             optimizer_tmp.load_state_dict(self._optimizer_theta3.state_dict())
 
             model_tmp.zero_grad()
@@ -161,7 +158,7 @@ class ImageClassifier:
 
             deltas = {}
             for (name, param), (name_tmp, param_tmp) in zip(
-                    self._model.named_parameters(),
+                    self._classification_model.named_parameters(),
                     model_tmp.named_parameters()):
                 assert name == name_tmp
                 deltas[name] = weights[i] * (param_tmp.data - param.data)
@@ -179,25 +176,17 @@ class ImageClassifier:
         magic_model.eval() # batchnorm will give error if we don't do this
         test_logits = magic_model(self.x_test) #this part is magic_module
         test_loss = criterion(test_logits, self.y_test.long()) #the third term
-        # inputs_labels = torch.cat([train_inputs, train_labels.unsqueeze(1)], dim=1)
+
         weights = softmax_normalize(
                     weights,
                     temperature=self._softmax_temp)
-        infTerm = test_loss - torch.sum(self._influence_model(inputs,labels).squeeze().detach() * weights)  # the inf term, sum? todo: check this
-        print("infTerm", infTerm)
-        # test_loss = test_loss * float(batch_size) / float(
-        #     len(self._dataset['dev'])) #not using dev but train batch
+        infTerm = test_loss - torch.sum(self._influence_model(inputs,labels).squeeze().detach() * weights)
 
         weights_grad = torch.autograd.grad(
             infTerm, weights, retain_graph=True)[0]
         weights_grad_list.append(weights_grad)
-#       weight_grad += self._influence_model(train_inputs)
+
         weights_grad = sum(weights_grad_list)
-
-        print("weights_grad average before clip", sum(weights_grad) / len(weights_grad))
-        # weights_grad = torch.min(weights_grad, torch.ones_like(weights_grad))
-        # weights_grad = torch.max(weights_grad, -torch.ones_like(weights_grad))
-
 
         self._weights[ids] = weights.data / self._w_decay - weights_grad
         self._weights[ids] = torch.max(self._weights[ids], torch.ones_like(
@@ -207,8 +196,9 @@ class ImageClassifier:
             self._weights[ids] = torch.zeros_like(self._weights[ids])
         return self._weights[ids].data
 
+    # TODO Get rid of evaulate and test dataloader
     def evaluate(self, set_type):
-        self._model.eval()
+        self._classification_model.eval()
 
         preds_all, labels_all = [], []
         for batch in tqdm(self._data_loader[set_type],
@@ -217,7 +207,7 @@ class ImageClassifier:
             inputs, labels, _ = batch
 
             with torch.no_grad():
-                logits = self._model(inputs)
+                logits = self._classification_model(inputs)
 
             preds = torch.argmax(logits, dim=1)
             preds_all.append(preds)

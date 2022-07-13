@@ -11,11 +11,12 @@ from torch import optim
 from torch.utils.data import TensorDataset, DataLoader
 
 from torchvision import models
-from src.dataset import return_data
-from src.fenchel_classifier import ImageClassifier
-from src.model import Net, Net_influence
-from src.magic_module import MagicModule
-from src.utils import save_json
+from data.dataset import return_data
+from solver.fenchel_solver import FenchelSolver
+from modeling.classification_models import Net
+from modeling.influence_models import Net_influence
+from src.solver.magic_module import MagicModule
+from utils.utils import save_json
 
 EPSILON = 1e-5
 
@@ -26,7 +27,7 @@ def main(args):
     num_class = 10
     model = models.resnet34(pretrained=True).to('cuda')
     influence_model = Net_influence(1, num_class).to('cuda')
-    fenchen_classifier = ImageClassifier(x_test, y_test, model, influence_model)
+    fenchen_classifier = FenchelSolver(x_test, y_test, model, influence_model)
 
     fenchen_classifier.load_data("train", train_loader.dataset, args.batch_size, shuffle=True)
     fenchen_classifier.load_data("test", test_loader.dataset, args.batch_size, shuffle=False)
@@ -41,7 +42,7 @@ def main(args):
 
     for epoch in range(args.max_epoch):
         fenchen_classifier.train_epoch()
-        fenchen_classifier.save_checkpoint(args.ckpt_dir + args.ckpt_name)
+        fenchen_classifier.save_checkpoint(args._ckpt_dir + args.ckpt_name)
         result = {}
         
         train_dataset_size = len(train_loader.dataset)

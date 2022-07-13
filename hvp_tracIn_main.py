@@ -2,12 +2,12 @@ import os
 import torch
 import json
 import argparse
-from kewen.IF_project.fenchel import fenchel_calc
+# from kewen.IF_project.fenchel import fenchel_calc
 
-from src.utils import save_json
-from src.dataset import return_data
-from src.tracIn import tracin_cp
-from src.hvp_grad import calc_influence_single
+from utils.utils import save_json
+from data.dataset import return_data
+from src.baseline.tracIn import tracin_cp
+from src.baseline.hvp_grad import calc_influence_single
 
 def main(args):
     device = torch.device("cuda:{}".format(args.gpu))

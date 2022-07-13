@@ -1,94 +1,93 @@
 import argparse
 import os
 import numpy as np
-from sklearn.utils import shuffle
 from tqdm import tqdm
-import copy
 
 import torch
-from torch import nn
-from torch import optim
-from torch.utils.data import TensorDataset, DataLoader
 
-from torchvision import models
-from src.utils import save_json
-from src.dataset import return_data
-from src.fenchel_classifier import ImageClassifier
+from src.utils.utils import save_json
+from src.utils.dataset import return_data
+from src.solver.fenchel_solver import FenchelSolver
 
-from src.magic_module import MagicModule
-from src.model import GMM1D_influence, LogisticRegression
+from src.modeling.influence_models import GMM1D_IF
+from src.modeling.classification_models import LogisticRegression
+
+import wandb
+import yaml
+from types import SimpleNamespace
+
+os.chdir('/home/xiaochen/kewen/IF_project')
 EPSILON = 1e-5
 
+
+YAMLPath = 'src/config/GMM1D/GMM1D_exp09.yaml'
+
 def main(args):
-    train_loader, test_loader = return_data(args.batch_size, "GMM1D")
+    train_dataset, test_dataset = return_data(args.batch_size, "GMM1D")
     input_dim = 1
     num_class = 2
-    x_test, y_test = test_loader.dataset[args.test_id_num]
-    x_test, y_test = test_loader.collate_fn([x_test]).float(), test_loader.collate_fn([y_test]).float()
+    x_test, y_test = test_dataset[args.test_id_num]
+    x_test, y_test = torch.FloatTensor([[x_test]]), torch.IntTensor([y_test])
 
-    model = LogisticRegression(input_dim,num_class).to('cuda') # 2class
-    # influence_models = nn.ModuleList([GMM1D_influence(input_dim,1).to('cuda')]*num_class) # influence score
-    influence_model = GMM1D_influence(input_dim, 1, num_class).to('cuda') # influence score
-    fenchen_classifier = ImageClassifier(x_test, y_test, model = model, influence_model = influence_model)
+    if args.classification_model == 'LogisticRegression':
+        classification_model = LogisticRegression(input_dim,num_class).to('cuda') # 2class
+    else:
+        raise NotImplementedError()
+    
+    if args.influence_model == 'GMM1D_IF':
+        influence_model = GMM1D_IF(input_dim, 1, num_class).to('cuda') # influence score
+    else:
+        raise NotImplementedError()
 
-    fenchen_classifier.load_data("train", train_loader.dataset, args.batch_size, shuffle=True)
-    fenchen_classifier.load_data("test", test_loader.dataset, args.batch_size, shuffle=False)
+    fenchen_classifier = FenchelSolver(x_test, y_test, classification_model = classification_model, influence_model = influence_model, softmax_temp=args.softmax_temp)
+
+    fenchen_classifier.load_data("train", train_dataset, args.batch_size, shuffle=True)
+    fenchen_classifier.load_data("test", test_dataset, args.batch_size, shuffle=False)
     
 
     fenchen_classifier.init_weights(
-        n_examples=len(train_loader.dataset),
-        w_init=args.w_init,
-        w_decay=args.w_decay)
+        n_examples=len(train_dataset),
+        w_init=args.influence_weight_init,
+        w_decay=args.influence_weight_decay)
 
-    fenchen_classifier.get_optimizer(args.image_lr, args.image_momentum, args.image_weight_decay)
+    fenchen_classifier.get_optimizer(args.classification_lr, args.classification_momentum, args.classification_weight_decay)
 
     for epoch in range(args.max_epoch):
+        
         fenchen_classifier.train_epoch()
-        fenchen_classifier.save_checkpoint(args.ckpt_dir + args.ckpt_name)
+        fenchen_classifier.save_checkpoint(args._ckpt_dir + args.ckpt_name)
         
         result = {}
-        train_dataset_size = len(train_loader.dataset)
+        train_dataset_size = len(train_dataset)
         influences = [0.0 for _ in range(train_dataset_size)]
         # TODO compute by batch
         for i in tqdm(range(train_dataset_size)):
-            x, y = train_loader.dataset[i]
+            x, y = train_dataset[i]
             influences[i] = influence_model(torch.cuda.FloatTensor([x.item()]).unsqueeze(0),torch.cuda.LongTensor([y.item()])).cpu().item()
         influences = np.array(influences)
-        harmful = np.argsort(influences)
-        helpful = harmful[::-1]
+        helpful = np.argsort(influences)
+        harmful = helpful[::-1]
         result["helpful"] = helpful[:500].tolist()
         result["harmful"] = harmful[:500].tolist()
         result["influence"] = influences.tolist()
-        json_path = os.path.join(args.output_path, f"IF_GMM1D_testid_{args.test_id_num}_epoch_{epoch}.json")
+        json_path = os.path.join("outputs", args.dataset_name, f"IF_GMM1D_testid_{args.test_id_num}_epoch_{epoch}.json")
         save_json(result, json_path)
+        helpful_data = [ [train_dataset[x][0].item(), train_dataset[x][1].item()] for x in helpful[:100]]
+        table = wandb.Table(data=helpful_data, columns = ["x", "class"])
+        wandb.log({f"helpful_data_epoch{epoch}" : wandb.plot.scatter(table,
+                                    "x", "class")})
 
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    with open(YAMLPath) as file:
+        config = yaml.safe_load(file)   
+        wandb.init(
+            project="IF_PROJECT",
+            name = f"{config['dataset_name']}_test_id_{config['test_id_num']}",
+            config=config
+        )
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(config["_gpu_id"])
+        config = SimpleNamespace(**config)
 
-    parser.add_argument('--seed', default=1, type=int, help='random seed')
-    parser.add_argument('--gpu', default=1, type=int, help='gpu index')
-    parser.add_argument('--max_epoch', default=10, type=float, help='maximum training epoch')
-    parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
-    parser.add_argument('--ckpt_dir', default='../checkpoints/fenchel/', type=str, help='checkpoint directory')
-    parser.add_argument('--ckpt_name', default='last', type=str, help='load previous checkpoint. insert checkpoint filename')
-    parser.add_argument('--num_workers', default=2, type=int, help='dataloader num_workers')
-    parser.add_argument('--display_step', default=2000, type=int, help='number of iterations after which loss data is printed and visdom is updated')
-    parser.add_argument('--batch_size', default=64, type=int, help='batch size')
-
-    parser.add_argument('--image_lr', default=1e-3, type=float)
-    parser.add_argument('--image_momentum', default=0.9, type=float)
-    parser.add_argument('--image_weight_decay', default=0.01, type=float)
-
-    # weighting
-    parser.add_argument("--w_decay", default=10., type=float)
-    parser.add_argument("--w_init", default=0., type=float)
-    parser.add_argument('--output_path', type=str, default="../outputs/GMM1D", help="where to put images")
-
-    parser.add_argument('--test_id_num', type=int, default=1, help="id of test example in testloader, 0 is [-1,0], 1 is [1,1]")
-    args = parser.parse_args()
-
-    # Target
-
-    main(args)
+    main(config)

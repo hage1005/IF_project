@@ -16,7 +16,7 @@ class Solver():
         self.global_iter = 0
         self.batch_size = args.batch_size
         self.net = Net().to(self.device)
-        self.optim = optim.SGD(self.net.parameters(), lr=args.lr)
+        self.optim = optim.SGD(self.net.parameters(), lr=args.influence_lr)
         self.display_step = args.display_step
         self.save_step = args.save_step
         self.ckpt_dir = args.ckpt_dir

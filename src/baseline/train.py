@@ -4,8 +4,8 @@ import os
 import numpy as np
 import torch
 from solver import Solver
-from dataset import return_data
-from utils import save_json
+from ..data.dataset import return_data
+from utils.utils import save_json
 
 def main(args):
     seed = args.seed
@@ -30,7 +30,7 @@ def main(args):
             'lr':args.lr,
             'batch_size':args.batch_size
         }
-    file_path = os.path.join(args.ckpt_dir, 'config_dic')
+    file_path = os.path.join(args._ckpt_dir, 'config_dic')
     save_json(config_dic, file_path)
     
     solver.train(train_loader)

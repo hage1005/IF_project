@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "fenchel_GMM1D_main",
+            "name": "fenchel_GMM_main",
             "type": "python",
             "request": "launch",
-            "program": "fenchel_GMM1D_main.py",
+            "program": "fenchel_GMM_main.py",
             "console": "integratedTerminal",
             "justMyCode": true
         },

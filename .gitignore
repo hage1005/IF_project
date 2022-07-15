@@ -4,3 +4,4 @@ data/*
 outputs/*
 notebooks/data
 wandb
+checkpoints

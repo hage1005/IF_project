@@ -17,8 +17,8 @@ EPSILON = 1e-5
 
 
 class FenchelSolver:
-    def __init__(self, x_test, y_test, classification_model, influence_model, pretrained=True,
-                 baseline=False, softmax_temp=1.):
+    def __init__(self, x_test, y_test, classification_model, influence_model, pretrained=True
+        , softmax_temp=1., train_classification_till_converge=False):
                  
         self._influence_model = influence_model
         self._classification_model = classification_model
@@ -31,8 +31,6 @@ class FenchelSolver:
         self._weights = None
         self._w_decay = None
 
-        self._baseline = baseline
-
         self._softmax_temp = softmax_temp
 
         self.global_iter = 0
@@ -40,6 +38,8 @@ class FenchelSolver:
 
         self.x_test = x_test.to('cuda')
         self.y_test = y_test.to('cuda')
+
+        self.train_classification_till_converge = train_classification_till_converge
 
     def init_weights(self, n_examples, w_init, w_decay):
         self._weights = torch.tensor(
@@ -81,13 +81,13 @@ class FenchelSolver:
                 self._weights[ids].detach(),
                 temperature=self._softmax_temp)
 
-            weights_varience = torch.var(weights)
-            wandb.log({'weights_varience': weights_varience})
+            weights_variance = torch.var(weights)
+            wandb.log({'weights_variance': weights_variance})
             self._optimizer_theta1.zero_grad()
 
-            loss_F = torch.sum(self._influence_model(inputs, labels).flatten() * weights) - torch.mean( self._influence_model(inputs, labels).flatten() )
-            # loss_F = torch.log(loss_F+10) 
-            loss_F.backward() #theta 1 update, todo: does weights change?
+            loss_influence = torch.sum(self._influence_model(inputs, labels).flatten() * weights) - torch.mean( self._influence_model(inputs, labels).flatten() )
+            # loss_influence = torch.log(loss_influence+10) 
+            loss_influence.backward() #theta 1 update, todo: does weights change?
             self._optimizer_theta1.step()
 
             if is_pretrain:
@@ -102,22 +102,23 @@ class FenchelSolver:
             lossHistory = []
             while 1:
                 logits = self._classification_model(inputs)
-                loss = criterion(logits, labels)
-                loss = torch.sum(loss * weights.data)
-                loss.backward() #theta 3 update
+                loss_classification = criterion(logits, labels)
+                loss_classification = torch.sum(loss_classification * weights.data)
+                loss_classification.backward() #theta 3 update
                 self._optimizer_theta3.step()
-                lossHistory.append(loss)
-                if loss.isnan():
+                if loss_classification.isnan() or self.train_classification_till_converge:
                     break
+                lossHistory.append(loss_classification)
+                
                 # compare the variance of last 5 loss
                 if len(lossHistory) > 5:
                     if torch.var(torch.stack(lossHistory[-5:])).item() < 0.1:
                         break
                     
-            wandb.log({'uniform_minus_weighted_influence': loss_F, 'classification_loss': loss})
+            wandb.log({'uniform_minus_weighted_influence': -loss_influence, 'classification_loss': loss_classification})
             if self.global_iter % 200 == 0:
-                pbar.write('[{}] loss_F: {:.3f}, loss: {:.3F} '.format(
-                            self.global_iter, loss_F, loss))
+                pbar.write('[{}] loss_influence: {:.3f}, loss: {:.3F} '.format(
+                            self.global_iter, loss_influence, loss_classification))
                 
 
     def _get_weights(self, batch, no_update = False): # batch is from train set
@@ -177,10 +178,10 @@ class FenchelSolver:
         test_logits = magic_model(self.x_test) #this part is magic_module
         test_loss = criterion(test_logits, self.y_test.long()) #the third term
 
-        weights = softmax_normalize(
+        weights_tmp = softmax_normalize(
                     weights,
                     temperature=self._softmax_temp)
-        infTerm = test_loss - torch.sum(self._influence_model(inputs,labels).squeeze().detach() * weights)
+        infTerm = test_loss - torch.sum(self._influence_model(inputs,labels).squeeze().detach() * weights_tmp)
 
         weights_grad = torch.autograd.grad(
             infTerm, weights, retain_graph=True)[0]

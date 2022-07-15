@@ -1,0 +1,22 @@
+program: fenchel_GMM_main.py
+method: bayes
+metric:
+  name: total_weight_variance
+  goal: minimize
+parameters:
+  # max_epoch:
+  #   values: [50]
+  influence_lr:
+    values: [0.001, 0.01, 0.1]
+  classificationlr: 
+    values: [0.001, 0.01, 0.1]
+  batch_size:
+    values: [16, 32, 64]
+  classification_momentum:
+    values: [0.9]
+  classification_weight_decay:
+    values: [0.001, 0.01]
+  influence_weight_decay:
+    values: [1]
+  softmax_temp:
+    values: [0.1, 1.0, 10.0]

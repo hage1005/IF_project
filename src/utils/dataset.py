@@ -1,4 +1,5 @@
 import os
+import random
 import numpy as np
 
 import torch
@@ -11,37 +12,78 @@ abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 os.chdir(dname)
 
-def return_data(batch_size, dataset_name):
-    if dataset_name == 'cifar10':
-        num_workers = 2
-        transform = transforms.Compose(
-            [transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+class DataExample:
+    def __init__(self, input, label):
+        self.input = input
+        self.label = label
 
-        train_data = torchvision.datasets.CIFAR10(root='../data', train=True,
-                                                download=True, transform=transform)
-        # train_loader = DataLoader(train_data, batch_size=batch_size,
-        #                         shuffle=True, num_workers=num_workers)
+def get_cifar10_data(classes, num_per_class):
+    transform = transforms.Compose(
+        [transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
 
-        test_data = torchvision.datasets.CIFAR10(root='../data', train=False,
-                                                download=True, transform=transform)
-        # test_loader = DataLoader(test_data, batch_size=batch_size,
-        #                         shuffle=True, num_workers=num_workers)
+    train_data = torchvision.datasets.CIFAR10(root='../data', train=True,
+                                            download=True, transform=transform)
 
-        print('loaded train_dataset with {} samples,test_dataset with {} samples, '.format(len(train_data),len(test_data) ))
-        
-        return train_data, test_data
-    elif dataset_name == "GMM1D":
-        train_df = pd.read_csv("data/1D_1000sample_2class_train.csv")
-        train_data = TensorDataset(torch.tensor(train_df['x']).reshape(-1,1), torch.tensor(train_df['y']).reshape(-1,1))
-        # train_loader = DataLoader(train_data, batch_size=batch_size,
-        #                         shuffle=True, num_workers=1)
+    all_examples = [DataExample(input=t[0], label=t[1])
+                    for t in train_data]
 
-        test_df = pd.read_csv("data/1D_1000sample_2class_test.csv")
-        test_data = TensorDataset(torch.tensor(test_df['x']).reshape(-1,1), torch.tensor(test_df['y']))
-        # test_loader = DataLoader(test_data, batch_size=batch_size,
-        #                         shuffle=True, num_workers=1)
+    train_data = _subsample_by_classes(all_examples, classes, num_per_class)
 
-        print('loaded train_dataset with {} samples,test_dataset with {} samples, '.format(len(train_data),len(test_data) ))
+    test_data = torchvision.datasets.CIFAR10(root='../data', train=False,
+                                            download=True, transform=transform)
 
-        return train_data, test_data
+    print('loaded train_dataset with {} samples,test_dataset with {} samples, '.format(len(train_data),len(test_data) ))
+    
+    return train_data, test_data
+
+def get_GMM1D_data():
+    train_df = pd.read_csv("data/1D_1000sample_2class_train.csv")
+    x = [eval(x) for x in train_df['x']]
+    y = train_df['y']
+    train_data = TensorDataset(torch.FloatTensor(x), torch.LongTensor(y))
+
+    test_df = pd.read_csv("data/1D_1000sample_2class_test.csv")
+    x = [eval(x) for x in test_df['x']]
+    y = test_df['y']
+    test_data = TensorDataset(torch.FloatTensor(x), torch.LongTensor(y))
+
+    print('loaded train_dataset with {} samples,test_dataset with {} samples, '.format(len(train_data),len(test_data) ))
+
+    return train_data, test_data
+
+def get_GMM2D_data():
+    train_df = pd.read_csv("data/2D_1000sample_2class_train.csv")
+    x = [eval(x) for x in train_df['x']]
+    y = train_df['y']
+    train_data = TensorDataset(torch.FloatTensor(x), torch.LongTensor(y))
+
+    test_df = pd.read_csv("data/2D_1000sample_2class_test.csv")
+    x = [eval(x) for x in test_df['x']]
+    y = test_df['y']
+    test_data = TensorDataset(torch.FloatTensor(x), torch.LongTensor(y))
+
+    print('loaded train_dataset with {} samples,test_dataset with {} samples, '.format(len(train_data),len(test_data) ))
+
+    return train_data, test_data
+
+def _subsample_by_classes(all_examples, labels, num_per_class=None):
+    if num_per_class is None:
+        return all_examples
+
+    examples = {label: [] for label in labels}
+    for example in all_examples:
+        if example.label in labels:
+            examples[example.label].append(example)
+
+    picked_examples = []
+    for label in labels:
+        random.shuffle(examples[label])
+
+        examples_with_label = examples[label][:num_per_class[label]]
+        picked_examples.extend(examples_with_label)
+
+        print(f'number of examples with label \'{label}\': '
+              f'{len(examples_with_label)}')
+
+    return picked_examples

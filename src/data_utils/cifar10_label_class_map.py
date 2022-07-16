@@ -10,4 +10,14 @@ cifar_class_label_dict = {
     'ship': 8,
     'truck': 9,
 }
-CLASS_MAP = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+CLASS_MAP = [
+    'airplane',
+    'automobile',
+    'bird',
+    'cat',
+    'deer',
+    'dog',
+    'frog',
+    'horse',
+    'ship',
+    'truck']

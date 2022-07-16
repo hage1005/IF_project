@@ -20,17 +20,15 @@ import wandb
 import yaml
 
 os.chdir('/home/xiaochen/kewen/IF_project')
-EPSILON = 1e-5
 YAMLPath = 'src/config/cifar10/exp01.yaml'
-
-
+# YAMLPath = 'src/config/cifar10/good_config/8.yaml'
 
 def main(args):
-    #set seed for reproducibility
+    # set seed for reproducibility
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
     np.random.seed(args.seed)
-    
+
     def get_single_image_from_dataset(dataset, idx):
         x, y = dataset[idx]
         x = x.unsqueeze(0)
@@ -39,17 +37,21 @@ def main(args):
 
     train_classes = [cifar_class_label_dict[c] for c in args.train_classes]
 
-    train_dataset, train_dataset_no_transform = get_cifar10_train(classes = train_classes, num_per_class = args.num_per_class)
+    train_dataset, train_dataset_no_transform = get_cifar10_train(
+        classes=train_classes, num_per_class=args.num_per_class)
     test_dataset, test_dataset_no_transform = get_cifar10_test()
 
-    x_test, y_test = get_single_image_from_dataset(test_dataset, args.test_id_num)
+    x_test, y_test = get_single_image_from_dataset(
+        test_dataset, args.test_id_num)
 
-    wandb.run.summary['test_image'] = wandb.Image(x_test, caption={'label': CLASS_MAP[y_test.item()]})
-
+    wandb.run.summary['test_image'] = wandb.Image(
+        x_test, caption={'label': CLASS_MAP[y_test.item()]})
 
     if args.classification_model == 'Resnet34':
         classification_model = models.resnet34(pretrained=True).to('cuda')
-        classification_model.fc = torch.nn.Linear(classification_model.fc.in_features, args._num_class).to('cuda')
+        classification_model.fc = torch.nn.Linear(
+            classification_model.fc.in_features,
+            args._num_class).to('cuda')
     elif args.classification_model == 'CnnCifar':
         classification_model = CnnCifar().to('cuda')
     else:
@@ -60,60 +62,78 @@ def main(args):
     else:
         raise NotImplementedError()
 
-    fenchen_classifier = FenchelSolver(x_test, y_test, classification_model = classification_model, influence_model = influence_model
-        , softmax_temp=args.softmax_temp, train_classification_till_converge = args.train_classification_till_converge)
+    fenchen_classifier = FenchelSolver(
+        x_test,
+        y_test,
+        classification_model=classification_model,
+        influence_model=influence_model,
+        softmax_temp=args.softmax_temp,
+        train_classification_till_converge=args.train_classification_till_converge)
 
-    fenchen_classifier.load_data("train", train_dataset, args.batch_size, shuffle=True)
-    fenchen_classifier.load_data("test", test_dataset, args.batch_size, shuffle=False)
-    
+    fenchen_classifier.load_data(
+        "train",
+        train_dataset,
+        args.batch_size,
+        shuffle=True)
+    fenchen_classifier.load_data(
+        "test",
+        test_dataset,
+        args.batch_size,
+        shuffle=False)
 
     fenchen_classifier.init_weights(
         n_examples=len(train_dataset),
         w_init=args.influence_weight_init,
         w_decay=args.influence_weight_decay)
 
-    fenchen_classifier.get_optimizer(args.classification_lr, args.classification_momentum, args.classification_weight_decay)
+    fenchen_classifier.get_optimizer(
+        args.classification_lr,
+        args.classification_momentum,
+        args.classification_weight_decay)
 
     for epoch in range(args.max_epoch):
         fenchen_classifier.train_epoch()
         fenchen_classifier.save_checkpoint(args._ckpt_dir + args._ckpt_name)
         result = {}
-        
+
         train_dataset_size = len(train_dataset)
         influences = [0.0 for _ in range(train_dataset_size)]
         # TODO compute by batch
         for i in tqdm(range(train_dataset_size)):
-            x, y = train_dataset[i:i+1][0], train_dataset[i:i+1][1]
+            x, y = train_dataset[i:i + 1][0], train_dataset[i:i + 1][1]
             influences[i] = influence_model(x.cuda(), y.cuda()).cpu().item()
         influences = np.array(influences)
-        harmful = np.argsort(influences)
-        helpful = harmful[::-1]
+        helpful = np.argsort(influences)
+        harmful = helpful[::-1]
         result["helpful"] = helpful[:500].tolist()
         result["harmful"] = harmful[:500].tolist()
         result["influence"] = influences.tolist()
-        json_path = os.path.join("outputs", args.dataset_name, f"IF_{args.dataset_name}_testid_{args.test_id_num}_epoch_{epoch}.json")
+        json_path = os.path.join(
+            "outputs",
+            args.dataset_name,
+            f"IF_{args.dataset_name}_testid_{args.test_id_num}_epoch_{epoch}.json")
         save_json(result, json_path)
 
+        wandb.log({'total_weight_variance': torch.var(
+            fenchen_classifier._weights).item()})
+
         fig = plt.figure(figsize=(6, 7))
-        for i in range(1,10):
+        for i in range(1, 10):
             x, y = train_dataset_no_transform[helpful[i]]
-            fig.add_subplot(3,3,i)
-            plt.title(f"{CLASS_MAP[y]}_{influences[helpful[i]]:.2f}" )
-            plt.imshow(x.permute(1,2,0))
-        wandb.log({"helpful_image": fig})
+            fig.add_subplot(3, 3, i)
+            plt.title(f"{CLASS_MAP[y]}_{influences[helpful[i]]:.2f}")
+            plt.imshow(x.permute(1, 2, 0))
+        wandb.log({f"helpful_image_for_{CLASS_MAP[y_test.item()]}": fig})
 
         plt.clf()
         fig = plt.figure(figsize=(6, 7))
-        for i in range(1,10):
+        for i in range(1, 10):
             x, y = train_dataset_no_transform[harmful[i]]
-            fig.add_subplot(3,3,i)
-            plt.title(f"{CLASS_MAP[y]}_{influences[harmful[i]]:.2f}" )
-            plt.imshow(x.permute(1,2,0))
-        wandb.log({"harmful_image": fig})
+            fig.add_subplot(3, 3, i)
+            plt.title(f"{CLASS_MAP[y]}_{influences[harmful[i]]:.2f}")
+            plt.imshow(x.permute(1, 2, 0))
+        wandb.log({f"harmful_image_for_{CLASS_MAP[y_test.item()]}": fig})
         plt.clf()
-    
-    
-
 
 
 if __name__ == "__main__":
@@ -124,12 +144,12 @@ if __name__ == "__main__":
     #     YAMLPath = args.YAMLPath
 
     with open(YAMLPath) as file:
-        config = yaml.safe_load(file)   
+        config = yaml.safe_load(file)
         wandb.init(
             project="IF_PROJECT",
-            name = f"{config['dataset_name']}_testId{config['test_id_num']}_IFlr{config['influence_lr']}_IFlr{config['classification_lr']}_IFwd{config['classification_weight_decay']}_IFmomentum{config['classification_momentum']}_IFdecay{config['influence_weight_decay']}_softmaxTemp{config['softmax_temp']}",
+            name=f"{config['dataset_name']}_testId{config['test_id_num']}_IFlr{config['influence_lr']}_IFlr{config['classification_lr']}_IFwd{config['classification_weight_decay']}_IFmomentum{config['classification_momentum']}_IFdecay{config['influence_weight_decay']}_softmaxTemp{config['softmax_temp']}",
             config=config
         )
-        # os.environ["CUDA_VISIBLE_DEVICES"] = str(config["_gpu_id"])
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(config["_gpu_id"])
 
     main(wandb.config)

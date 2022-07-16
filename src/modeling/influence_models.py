@@ -6,15 +6,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+
 class Net_IF(nn.Module):
-    def __init__(self, num_classes, out_dim = 1):
+    def __init__(self, num_classes, out_dim=1):
         super(Net_IF, self).__init__()
         self.conv1 = nn.Conv2d(3, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5)
         self.fc1 = nn.Linear(16 * 5 * 5, 120)
         self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, out_dim*num_classes)
+        self.fc3 = nn.Linear(84, out_dim * num_classes)
 
     def forward(self, x, y):
         x = self.pool(F.relu(self.conv1(x)))
@@ -25,10 +26,12 @@ class Net_IF(nn.Module):
         x = self.fc3(x)
         return torch.gather(x, 1, y.view(-1, 1))
 
+
 class Linear_IF(nn.Module):
-     def __init__(self, input_dim, num_class):
-         super(Linear_IF, self).__init__()
-         self.linear = torch.nn.Linear(input_dim, num_class)
-     def forward(self, x, y):
-         outputs = self.linear(x)
-         return torch.gather(outputs,1,y.unsqueeze(1))
+    def __init__(self, input_dim, num_class):
+        super(Linear_IF, self).__init__()
+        self.linear = torch.nn.Linear(input_dim, num_class)
+
+    def forward(self, x, y):
+        outputs = self.linear(x)
+        return torch.gather(outputs, 1, y.unsqueeze(1))

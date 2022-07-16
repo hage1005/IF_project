@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+
 class CnnCifar(nn.Module):
     def __init__(self, out_dim):
         super(CnnCifar, self).__init__()
@@ -25,10 +26,12 @@ class CnnCifar(nn.Module):
         x = self.fc3(x)
         return x
 
+
 class LogisticRegression(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(LogisticRegression, self).__init__()
         self.linear = torch.nn.Linear(input_dim, output_dim)
+
     def forward(self, x):
         outputs = torch.sigmoid(self.linear(x))
         return outputs

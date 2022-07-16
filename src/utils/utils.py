@@ -6,6 +6,7 @@ from pathlib import Path
 import json
 from datetime import datetime as dt
 
+
 def calc_loss(logits, labels, loss_func="cross_entropy"):
     """Calculates the loss
     Arguments:
@@ -14,16 +15,18 @@ def calc_loss(logits, labels, loss_func="cross_entropy"):
         loss_func: str, specify loss function name
     Returns:
         loss: scalar, the loss"""
-    
+
     if loss_func == "cross_entropy":
         if logits.shape[-1] == 1:
-            loss = F.binary_cross_entropy_with_logits(logits, labels.type(torch.float))
+            loss = F.binary_cross_entropy_with_logits(
+                logits, labels.type(torch.float))
         else:
             loss = F.cross_entropy(logits, labels)
     elif loss_func == "mean":
         loss = torch.mean(logits)
     else:
-        raise ValueError("{} is not a valid value for loss_func".format(loss_func))
+        raise ValueError(
+            "{} is not a valid value for loss_func".format(loss_func))
 
     return loss
 
@@ -52,6 +55,7 @@ def grad_z(x, y, model, device, loss_func="cross_entropy"):
     # Compute sum of gradients from model parameters to loss
     return grad(loss, model.parameters())
 
+
 def make_functional(model):
     orig_params = tuple(model.parameters())
     # Remove all the parameters in the model
@@ -63,12 +67,14 @@ def make_functional(model):
 
     return orig_params, names
 
+
 def load_weights(model, names, params, as_params=False):
     for name, p in zip(names, params):
         if not as_params:
             set_attr(model, name.split("."), p)
         else:
             set_attr(model, name.split("."), torch.nn.Parameter(p))
+
 
 def del_attr(obj, names):
     if len(names) == 1:
@@ -82,6 +88,7 @@ def set_attr(obj, names, val):
         setattr(obj, names[0], val)
     else:
         set_attr(getattr(obj, names[0]), names[1:], val)
+
 
 def display_progress(text, current_step, last_step, enabled=True,
                      fix_zero_start=True):
@@ -120,7 +127,7 @@ def display_progress(text, current_step, last_step, enabled=True,
     bar = '=' * filled_len + '.' * (bar_len - filled_len)
 
     bar = f"{text}[{bar:s}] {current_step:d} / {last_step:d}"
-    if current_step < last_step-1:
+    if current_step < last_step - 1:
         # Erase to end of line and print
         sys.stdout.write("\033[K" + bar + "\r")
     else:
@@ -128,11 +135,13 @@ def display_progress(text, current_step, last_step, enabled=True,
 
     sys.stdout.flush()
 
+
 def load_json(json_path):
-    with open (json_path, "r") as f:
+    with open(json_path, "r") as f:
         json_obj = json.loads(f.read())
     return json_obj
-    
+
+
 def save_json(
     json_obj,
     json_path,
@@ -187,4 +196,3 @@ def save_json(
 
     with open(json_path, "w+") as fout:
         json.dump(json_obj, fout, indent=2)
-

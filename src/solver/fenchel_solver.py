@@ -17,9 +17,16 @@ EPSILON = 1e-5
 
 
 class FenchelSolver:
-    def __init__(self, x_test, y_test, classification_model, influence_model, pretrained=True
-        , softmax_temp=1., train_classification_till_converge=False):
-                 
+    def __init__(
+            self,
+            x_test,
+            y_test,
+            classification_model,
+            influence_model,
+            pretrained=True,
+            softmax_temp=1.,
+            train_classification_till_converge=False):
+
         self._influence_model = influence_model
         self._classification_model = classification_model
 
@@ -56,7 +63,7 @@ class FenchelSolver:
         self._data_loader[set_type] = DataLoader(
             TensorDataset(all_inputs, all_labels, all_ids),
             batch_size=batch_size, shuffle=shuffle)
-    
+
     def get_optimizer(self, learning_rate, momentum, weight_decay):
         self._optimizer_theta3 = optim.SGD(
             self._classification_model.parameters(),
@@ -76,8 +83,8 @@ class FenchelSolver:
         for batch in pbar:
             inputs, labels, ids = tuple(t.to('cuda') for t in batch)
             self.global_iter += 1
-            
-            weights= softmax_normalize(
+
+            weights = softmax_normalize(
                 self._weights[ids].detach(),
                 temperature=self._softmax_temp)
 
@@ -85,9 +92,10 @@ class FenchelSolver:
             wandb.log({'weights_variance': weights_variance})
             self._optimizer_theta1.zero_grad()
 
-            loss_influence = torch.sum(self._influence_model(inputs, labels).flatten() * weights) - torch.mean( self._influence_model(inputs, labels).flatten() )
-            # loss_influence = torch.log(loss_influence+10) 
-            loss_influence.backward() #theta 1 update, todo: does weights change?
+            loss_influence = torch.sum(self._influence_model(inputs, labels).flatten(
+            ) * weights) - torch.mean(self._influence_model(inputs, labels).flatten())
+            # loss_influence = torch.log(loss_influence+10)
+            loss_influence.backward()  # theta 1 update, todo: does weights change?
             self._optimizer_theta1.step()
 
             if is_pretrain:
@@ -96,32 +104,33 @@ class FenchelSolver:
             else:
                 weights = softmax_normalize(
                     self._get_weights(batch),
-                    temperature=self._softmax_temp) #theta 2 update
+                    temperature=self._softmax_temp)  # theta 2 update
 
             self._optimizer_theta3.zero_grad()
             lossHistory = []
-            while 1:
+            while True:
                 logits = self._classification_model(inputs)
                 loss_classification = criterion(logits, labels)
-                loss_classification = torch.sum(loss_classification * weights.data)
-                loss_classification.backward() #theta 3 update
+                loss_classification = torch.sum(
+                    loss_classification * weights.data)
+                loss_classification.backward()  # theta 3 update
                 self._optimizer_theta3.step()
-                if loss_classification.isnan() or self.train_classification_till_converge:
+                if loss_classification.isnan() or not self.train_classification_till_converge:
                     break
                 lossHistory.append(loss_classification)
-                
+
                 # compare the variance of last 5 loss
                 if len(lossHistory) > 5:
                     if torch.var(torch.stack(lossHistory[-5:])).item() < 0.1:
                         break
-                    
-            wandb.log({'uniform_minus_weighted_influence': -loss_influence, 'classification_loss': loss_classification})
+
+            wandb.log({'uniform_minus_weighted_influence': - \
+                      loss_influence, 'classification_loss': loss_classification})
             if self.global_iter % 200 == 0:
                 pbar.write('[{}] loss_influence: {:.3f}, loss: {:.3F} '.format(
-                            self.global_iter, loss_influence, loss_classification))
-                
+                    self.global_iter, loss_influence, loss_classification))
 
-    def _get_weights(self, batch, no_update = False): # batch is from train set
+    def _get_weights(self, batch, no_update=False):  # batch is from train set
         self._classification_model.eval()
 
         inputs, labels, ids = tuple(t.to('cuda') for t in batch)
@@ -134,7 +143,8 @@ class FenchelSolver:
         criterion = nn.CrossEntropyLoss()
 
         model_tmp = copy.deepcopy(self._classification_model)
-        optimizer_hparams = self._optimizer_theta3.state_dict()['param_groups'][0]
+        optimizer_hparams = self._optimizer_theta3.state_dict()[
+            'param_groups'][0]
         optimizer_tmp = optim.SGD(
             model_tmp.parameters(),
             lr=optimizer_hparams['lr'],
@@ -152,8 +162,9 @@ class FenchelSolver:
             else:
                 l, r, t = i, i + 2, 0
 
-            logits = model_tmp(inputs[l:r])[t:t+1] # same as logits = model_tmp(inputs[i:i+1]) ?
-            loss = criterion(logits, labels[i:i+1]) #Not magic_module
+            # same as logits = model_tmp(inputs[i:i+1]) ?
+            logits = model_tmp(inputs[l:r])[t:t + 1]
+            loss = criterion(logits, labels[i:i + 1])  # Not magic_module
             loss.backward()
             optimizer_tmp.step()
 
@@ -163,7 +174,8 @@ class FenchelSolver:
                     model_tmp.named_parameters()):
                 assert name == name_tmp
                 deltas[name] = weights[i] * (param_tmp.data - param.data)
-            magic_model.update_params(deltas) #theta prime, make it the same as model_tmp
+            # theta prime, make it the same as model_tmp
+            magic_model.update_params(deltas)
 
         # TODO remove this
         weights_grad_list = []
@@ -174,14 +186,16 @@ class FenchelSolver:
 
         if weights.grad is not None:
             weights.grad.zero_()
-        magic_model.eval() # batchnorm will give error if we don't do this
-        test_logits = magic_model(self.x_test) #this part is magic_module
-        test_loss = criterion(test_logits, self.y_test.long()) #the third term
+        magic_model.eval()  # batchnorm will give error if we don't do this
+        test_logits = magic_model(self.x_test)  # this part is magic_module
+        test_loss = criterion(test_logits,
+                              self.y_test.long())  # the third term
 
         weights_tmp = softmax_normalize(
-                    weights,
-                    temperature=self._softmax_temp)
-        infTerm = test_loss - torch.sum(self._influence_model(inputs,labels).squeeze().detach() * weights_tmp)
+            weights,
+            temperature=self._softmax_temp)
+        infTerm = test_loss - \
+            torch.sum(self._influence_model(inputs, labels).squeeze().detach() * weights_tmp)
 
         weights_grad = torch.autograd.grad(
             infTerm, weights, retain_graph=True)[0]
@@ -192,8 +206,9 @@ class FenchelSolver:
         self._weights[ids] = weights.data / self._w_decay - weights_grad
         self._weights[ids] = torch.max(self._weights[ids], torch.ones_like(
             self._weights[ids]).fill_(EPSILON))
-        
-        if self._weights[ids].data[0] == torch.inf or self._weights[ids].data[0].isnan():
+
+        if self._weights[ids].data[0] == torch.inf or self._weights[ids].data[0].isnan(
+        ):
             self._weights[ids] = torch.zeros_like(self._weights[ids])
         return self._weights[ids].data
 
@@ -218,27 +233,33 @@ class FenchelSolver:
         labels_all = torch.cat(labels_all, dim=0)
 
         return torch.sum(preds_all == labels_all).item() / labels_all.shape[0]
-        
+
     def save_checkpoint(self, file_path, silent=True):
-        model_states = {'net':self._influence_model.state_dict(),}
-        optim_states = {'optim':self._optimizer_theta1.state_dict(),}
-        states = {'epoch':self.global_epoch,
-                'model_states':model_states,
-                'optim_states':optim_states}
+        model_states = {'net': self._influence_model.state_dict(), }
+        optim_states = {'optim': self._optimizer_theta1.state_dict(), }
+        states = {'epoch': self.global_epoch,
+                  'model_states': model_states,
+                  'optim_states': optim_states}
         with open(file_path, mode='wb+') as f:
             torch.save(states, f)
         if not silent:
-            print("=> saved checkpoint '{}' (iter {})".format(file_path, self.global_iter))
+            print(
+                "=> saved checkpoint '{}' (iter {})".format(
+                    file_path, self.global_iter))
 
     def load_checkpoint(self, file_path):
         if os.path.isfile(file_path):
-            checkpoint = torch.load(file_path, map_location='cuda:{}'.format(self.gpu))
+            checkpoint = torch.load(file_path,
+                                    map_location='cuda:{}'.format(self.gpu))
             self.global_epoch = checkpoint['epoch']
             self.net.load_state_dict(checkpoint['model_states']['net'])
             self.optim.load_state_dict(checkpoint['optim_states']['optim'])
-            print("=> loaded checkpoint '{} (epoch {})'".format(file_path, self.global_epoch))
+            print(
+                "=> loaded checkpoint '{} (epoch {})'".format(
+                    file_path, self.global_epoch))
         else:
             print("=> no checkpoint found at '{}'".format(file_path))
+
 
 def linear_normalize(weights):
     weights = torch.max(weights, torch.zeros_like(weights))

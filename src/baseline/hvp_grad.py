@@ -12,12 +12,21 @@ from .model import Net
 from .utils import (
     load_weights,
     make_functional,
-    calc_loss, 
+    calc_loss,
     grad_z
 )
 
 
-def s_test(x_test, y_test, model, i, samples_loader, device, damp=0.01, scale=25.0, loss_func="cross_entropy"):
+def s_test(
+        x_test,
+        y_test,
+        model,
+        i,
+        samples_loader,
+        device,
+        damp=0.01,
+        scale=25.0,
+        loss_func="cross_entropy"):
     """s_test can be precomputed for each test point of interest, and then
     multiplied with grad_z to get the desired value for each training point.
     Here, stochastic estimation is used to calculate s_test. s_test is the
@@ -43,7 +52,8 @@ def s_test(x_test, y_test, model, i, samples_loader, device, damp=0.01, scale=25
     # Make params regular Tensors instead of nn.Parameter
     params = tuple(p.detach().requires_grad_() for p in params)
 
-    # TODO: Dynamically set the recursion depth so that iterations stop once h_estimate stabilises
+    # TODO: Dynamically set the recursion depth so that iterations stop once
+    # h_estimate stabilises
     progress_bar = tqdm(samples_loader, desc=f"IHVP sample {i}")
     for i, (x_train, y_train) in enumerate(progress_bar):
 
@@ -72,7 +82,6 @@ def s_test(x_test, y_test, model, i, samples_loader, device, damp=0.01, scale=25
         load_weights(model, names, params, as_params=True)
 
     return h_estimate
-
 
 
 def s_test_sample(
@@ -109,8 +118,9 @@ def s_test_sample(
         s_test_vec: torch tensor, contains s_test for a single test image"""
 
     inverse_hvp = [
-        torch.zeros_like(params, dtype=torch.float) for params in model.parameters()
-    ]
+        torch.zeros_like(
+            params,
+            dtype=torch.float) for params in model.parameters()]
 
     for i in range(r):
 
@@ -124,7 +134,15 @@ def s_test_sample(
         )
 
         cur_estimate = s_test(
-            x_test, y_test, model, i, hessian_loader, device, damp=damp, scale=scale, loss_func=loss_func,
+            x_test,
+            y_test,
+            model,
+            i,
+            hessian_loader,
+            device,
+            damp=damp,
+            scale=scale,
+            loss_func=loss_func,
         )
 
         with torch.no_grad():
@@ -136,6 +154,7 @@ def s_test_sample(
         inverse_hvp = [component / r for component in inverse_hvp]
 
     return inverse_hvp
+
 
 def calc_influence_single(
     ckpt_dir,

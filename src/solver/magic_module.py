@@ -27,9 +27,9 @@ class MagicModule(nn.Module):
             self.add_module(key, MagicModule(value))
 
         for key, value in module.__dict__.items():
-            if (not key in self.__dict__) and\
-                    (not key in self._buffers) and\
-                    (not key in self._modules):
+            if (key not in self.__dict__) and\
+                    (key not in self._buffers) and\
+                    (key not in self._modules):
                 self.__setattr__(key, value)
 
     def forward(self, *args, **kwargs):
@@ -95,9 +95,17 @@ class MagicModule(nn.Module):
         assert issubclass(self._type, nn.Conv2d)
 
         if self.padding_mode != 'zeros':
-            return F.conv2d(F.pad(input, self._reversed_padding_repeated_twice, mode=self.padding_mode),
-                            weight, bias, self.stride,
-                            _pair(0), self.dilation, self.groups)
+            return F.conv2d(
+                F.pad(
+                    input,
+                    self._reversed_padding_repeated_twice,
+                    mode=self.padding_mode),
+                weight,
+                bias,
+                self.stride,
+                _pair(0),
+                self.dilation,
+                self.groups)
         return F.conv2d(input, weight, bias, self.stride,
                         self.padding, self.dilation, self.groups)
 

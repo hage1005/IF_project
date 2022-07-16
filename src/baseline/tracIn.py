@@ -21,7 +21,6 @@ def get_ordered_checkpoint_list(path):
     return all_checkpoints
 
 
-
 def tracin_cp(ckpt_dir, x_test, y_test, train_loader, device):
     """
     dic.keys(): path, network_config, suffix, lr, batchsize, use_last_layer
@@ -34,7 +33,8 @@ def tracin_cp(ckpt_dir, x_test, y_test, train_loader, device):
     influences = [0.0 for _ in range(train_dataset_size)]
     ordered_checkpoint_list = get_ordered_checkpoint_list(ckpt_dir)
 
-    # add \nabla loss(z_i, beta) * \nabla loss(z_test, beta) for every z_i over all steps
+    # add \nabla loss(z_i, beta) * \nabla loss(z_test, beta) for every z_i
+    # over all steps
     for checkpoint_name in ordered_checkpoint_list:
         # load model at this checkpoint
         model = Net()
@@ -42,7 +42,7 @@ def tracin_cp(ckpt_dir, x_test, y_test, train_loader, device):
                                 map_location='cpu')
         model.load_state_dict(checkpoint['model_states']['net'])
         model = model.to(device)
-        
+
         # print checkpoint iteration
         ckpt_interval = int(checkpoint_name) - ckpt_iter
         ckpt_iter = int(checkpoint_name)
@@ -53,19 +53,21 @@ def tracin_cp(ckpt_dir, x_test, y_test, train_loader, device):
 
         # compute gradient at z_i for each i
         for i in range(train_dataset_size):
-            input, label = train_loader.dataset[i][0],  train_loader.dataset[i][1]
-            input, label = train_loader.collate_fn([input]), train_loader.collate_fn([label])
+            input, label = train_loader.dataset[i][0], train_loader.dataset[i][1]
+            input, label = train_loader.collate_fn(
+                [input]), train_loader.collate_fn([label])
 
             grad_train = grad_z(input, label, model, device)
-        
+
             # add gradient dot product to influences
-            grad_dot_product = sum([torch.sum(k * j).data for k, j in zip(grad_train, grad_test)]).cpu().numpy()
-            influences[i] += grad_dot_product * dic['lr'] * dic['batch_size'] * ckpt_interval / train_dataset_size
-            
+            grad_dot_product = sum(
+                [torch.sum(k * j).data for k, j in zip(grad_train, grad_test)]).cpu().numpy()
+            influences[i] += grad_dot_product * dic['lr'] * \
+                dic['batch_size'] * ckpt_interval / train_dataset_size
+
             display_progress("Calc. grad dot product: ", i, train_dataset_size)
-    
+
     influences = np.array(influences)
     harmful = np.argsort(influences)
     helpful = harmful[::-1]
     return influences.tolist(), harmful.tolist(), helpful.tolist()
-

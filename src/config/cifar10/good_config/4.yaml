@@ -1,0 +1,22 @@
+exp_title: original_config
+dataset_name: cifar10
+train_classes: ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
+num_per_class: [100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
+classification_model: Resnet34
+influence_model: Net_IF
+max_epoch: 30
+influence_lr: 0.001
+classification_lr: 0.001
+batch_size: 32
+classification_momentum: 0.9
+classification_weight_decay: 0.01
+influence_weight_decay: 1
+influence_weight_init: 0.
+softmax_temp: 10
+test_id_num: 4
+train_classification_till_converge: False
+seed: 1
+_gpu_id: 7
+_ckpt_dir: checkpoints/fenchel/
+_num_class: 10
+_ckpt_name: last

@@ -18,6 +18,9 @@ def get_GMM1D_data():
     y = test_df['y']
     test_data = TensorDataset(torch.FloatTensor(x), torch.LongTensor(y))
 
-    print('loaded train_dataset with {} samples,test_dataset with {} samples, '.format(len(train_data),len(test_data) ))
+    print(
+        'loaded train_dataset with {} samples,test_dataset with {} samples, '.format(
+            len(train_data),
+            len(test_data)))
 
     return train_data, test_data

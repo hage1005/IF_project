@@ -1,5 +1,6 @@
 import argparse
 import os
+from matplotlib import pyplot as plt
 from sklearn.utils import shuffle
 from tqdm import tqdm
 import copy
@@ -9,30 +10,40 @@ import torch
 
 from torchvision import models
 from src.utils.utils import save_json
-from src.utils.dataset import return_data
+from src.data_utils.cifar10 import get_cifar10_train, get_cifar10_test
 from src.solver.fenchel_solver import FenchelSolver
 from src.modeling.classification_models import CnnCifar
 from src.modeling.influence_models import Net_IF
+from src.data_utils.cifar10_label_class_map import CLASS_MAP, cifar_class_label_dict
 
 import wandb
 import yaml
 
 os.chdir('/home/xiaochen/kewen/IF_project')
 EPSILON = 1e-5
+YAMLPath = 'src/config/cifar10/exp01.yaml'
 
-CLASS_MAP = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']									
 
-YAMLPath = 'src/config/CIFAR/exp01.yaml'
 
 def main(args):
-    def get_single_image(dataset, idx):
+    #set seed for reproducibility
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    
+    def get_single_image_from_dataset(dataset, idx):
         x, y = dataset[idx]
         x = x.unsqueeze(0)
         y = torch.LongTensor([y])
         return x, y
 
-    train_dataset, test_dataset = return_data(args.batch_size, "cifar10")
-    x_test, y_test = get_single_image(test_dataset, args.test_id_num)
+    train_classes = [cifar_class_label_dict[c] for c in args.train_classes]
+
+    train_dataset, train_dataset_no_transform = get_cifar10_train(classes = train_classes, num_per_class = args.num_per_class)
+    test_dataset, test_dataset_no_transform = get_cifar10_test()
+
+    x_test, y_test = get_single_image_from_dataset(test_dataset, args.test_id_num)
+
     wandb.run.summary['test_image'] = wandb.Image(x_test, caption={'label': CLASS_MAP[y_test.item()]})
 
 
@@ -72,7 +83,7 @@ def main(args):
         influences = [0.0 for _ in range(train_dataset_size)]
         # TODO compute by batch
         for i in tqdm(range(train_dataset_size)):
-            x, y = train_dataset[i:i+1]
+            x, y = train_dataset[i:i+1][0], train_dataset[i:i+1][1]
             influences[i] = influence_model(x.cuda(), y.cuda()).cpu().item()
         influences = np.array(influences)
         harmful = np.argsort(influences)
@@ -83,27 +94,34 @@ def main(args):
         json_path = os.path.join("outputs", args.dataset_name, f"IF_{args.dataset_name}_testid_{args.test_id_num}_epoch_{epoch}.json")
         save_json(result, json_path)
 
-        for i in range(min(9, len(helpful))):
-            x, y = train_dataset[helpful[i]]
-            wandb.run.summary[f"helpful_{i}"] = wandb.Image(train_dataset[helpful[i]])
-            Image = wandb.Image(train_dataset[helpful[i]][0], caption=f"{CLASS_MAP[y]}, id:{i}, influence={influences[helpful[i]]}")
-            wandb.log({"helpful_{i}": Image})
-        for i in range(min(9, len(harmful))):
-            x, y = train_dataset[harmful[i]]
-            wandb.run.summary[f"harmful_{i}"] = wandb.Image(train_dataset[harmful[i]])
-            Image = wandb.Image(train_dataset[harmful[i]][0], caption=f"{CLASS_MAP[y]}, id:{i}, influence={influences[harmful[i]]}")
-            wandb.log({"harmful_{i}": Image})
+        fig = plt.figure(figsize=(6, 7))
+        for i in range(1,10):
+            x, y = train_dataset_no_transform[helpful[i]]
+            fig.add_subplot(3,3,i)
+            plt.title(f"{CLASS_MAP[y]}_{influences[helpful[i]]:.2f}" )
+            plt.imshow(x.permute(1,2,0))
+        wandb.log({"helpful_image": fig})
+
+        plt.clf()
+        fig = plt.figure(figsize=(6, 7))
+        for i in range(1,10):
+            x, y = train_dataset_no_transform[harmful[i]]
+            fig.add_subplot(3,3,i)
+            plt.title(f"{CLASS_MAP[y]}_{influences[harmful[i]]:.2f}" )
+            plt.imshow(x.permute(1,2,0))
+        wandb.log({"harmful_image": fig})
+        plt.clf()
     
     
 
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--YAMLPath", type=str)
-    args = parser.parse_args()
-    if args.YAMLPath:
-        YAMLPath = args.YAMLPath
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--YAMLPath", type=str)
+    # args = parser.parse_args()
+    # if args.YAMLPath:
+    #     YAMLPath = args.YAMLPath
 
     with open(YAMLPath) as file:
         config = yaml.safe_load(file)   
@@ -112,6 +130,6 @@ if __name__ == "__main__":
             name = f"{config['dataset_name']}_testId{config['test_id_num']}_IFlr{config['influence_lr']}_IFlr{config['classification_lr']}_IFwd{config['classification_weight_decay']}_IFmomentum{config['classification_momentum']}_IFdecay{config['influence_weight_decay']}_softmaxTemp{config['softmax_temp']}",
             config=config
         )
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(config["_gpu_id"])
+        # os.environ["CUDA_VISIBLE_DEVICES"] = str(config["_gpu_id"])
 
     main(wandb.config)

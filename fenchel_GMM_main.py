@@ -6,7 +6,8 @@ from tqdm import tqdm
 import torch
 
 from src.utils.utils import save_json
-from src.utils.dataset import get_GMM1D_data, get_GMM2D_data
+from src.data_utils.GMM1D import get_GMM1D_data
+from src.data_utils.GMM2D import get_GMM2D_data
 from src.solver.fenchel_solver import FenchelSolver
 
 from src.modeling.influence_models import Linear_IF
@@ -109,7 +110,7 @@ def main(args):
         colours = ListedColormap(['r','b'])
         scatter = plt.scatter(x_axis, y_axis, c= helpful_data_y, cmap=colours)
         plt.legend(handles=scatter.legend_elements()[0], labels=classes)
-        wandb.log({f"helpful_data_epoch{epoch}" : plt})
+        wandb.log({f"helpful_data_epoch" : plt})
         plt.clf()
 
         harmful_data_x = [ train_dataset[x][0] for x in harmful[:num_to_plot]]
@@ -127,7 +128,7 @@ def main(args):
         colours = ListedColormap(['r','b'])
         scatter = plt.scatter(x_axis, y_axis, c= harmful_data_y, cmap=colours)
         plt.legend(handles=scatter.legend_elements()[0], labels=classes)
-        wandb.log({f"harmful_data_epoch{epoch}" : plt})
+        wandb.log({f"harmful_data_epoch" : plt})
 
 
 
@@ -143,7 +144,7 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)   
         wandb.init(
             project="IF_PROJECT",
-            name = f"sweep_{config['dataset_name']}_testId{config['test_id_num']}_IFlr{config['influence_lr']}_IFlr{config['classification_lr']}_IFwd{config['classification_weight_decay']}_IFmomentum{config['classification_momentum']}_IFdecay{config['influence_weight_decay']}_softmaxTemp{config['softmax_temp']}",
+            name = f"{config['dataset_name']}_testId{config['test_id_num']}_IFlr{config['influence_lr']}_IFlr{config['classification_lr']}_IFwd{config['classification_weight_decay']}_IFmomentum{config['classification_momentum']}_IFdecay{config['influence_weight_decay']}_softmaxTemp{config['softmax_temp']}",
             config=config
         )
         # os.environ["CUDA_VISIBLE_DEVICES"] = str(config["_gpu_id"])

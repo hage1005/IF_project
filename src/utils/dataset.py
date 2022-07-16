@@ -8,9 +8,6 @@ import torchvision
 from torchvision.datasets import ImageFolder
 from torchvision import transforms
 import pandas as pd
-abspath = os.path.abspath(__file__)
-dname = os.path.dirname(abspath)
-os.chdir(dname)
 
 class DataExample:
     def __init__(self, input, label):

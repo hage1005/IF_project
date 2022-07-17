@@ -1,4 +1,11 @@
 # Pytorch IF project
+# To run fenchel conjugate on GMM or CIFAR
+
+`python fenchel_GMM_main.py` or `python fenchel_CIFAR_main.py`
+- change the `os.chdir()` in the main file accordingly
+- change `YAML_PATH` for hyperparameter tuning 
+
+# TO run the baselines (under construction)
 First run src/train.py to train your model, it will be saved to checkpoints\
 Then Run main.py to compute IF
 

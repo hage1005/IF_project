@@ -1,5 +1,6 @@
 import argparse
 import os
+import random
 import numpy as np
 from tqdm import tqdm
 
@@ -21,14 +22,18 @@ from matplotlib.colors import ListedColormap
 from types import SimpleNamespace
 
 os.chdir('/home/xiaochen/kewen/IF_project')
-EPSILON = 1e-5
-
-
 YAMLPath = 'src/config/GMM2D/exp02.yaml'
 # YAMLPath = 'src/config/GMM1D/exp01.yaml'
 
 
 def main(args):
+     # set seed for reproducibility
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+    torch.backends.cudnn.deterministic=True
+    
     if args.dataset_name == 'GMM1D':
         train_dataset, test_dataset = get_GMM1D_data()
     elif args.dataset_name == 'GMM2D':

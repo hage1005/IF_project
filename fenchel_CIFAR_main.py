@@ -1,5 +1,6 @@
 import argparse
 import os
+import random
 from matplotlib import pyplot as plt
 from sklearn.utils import shuffle
 from tqdm import tqdm
@@ -28,6 +29,8 @@ def main(args):
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
     np.random.seed(args.seed)
+    random.seed(args.seed)
+    torch.backends.cudnn.deterministic=True
 
     def get_single_image_from_dataset(dataset, idx):
         x, y = dataset[idx]
@@ -147,7 +150,8 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
         wandb.init(
             project="IF_PROJECT",
-            name=f"{config['dataset_name']}_testId{config['test_id_num']}_IFlr{config['influence_lr']}_IFlr{config['classification_lr']}_IFwd{config['classification_weight_decay']}_IFmomentum{config['classification_momentum']}_IFdecay{config['influence_weight_decay']}_softmaxTemp{config['softmax_temp']}",
+            name=f"{config['dataset_name']}_testId{config['test_id_num']}",
+            settings=wandb.Settings(code_dir="src"),
             config=config
         )
         os.environ["CUDA_VISIBLE_DEVICES"] = str(config["_gpu_id"])

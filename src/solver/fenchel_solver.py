@@ -64,13 +64,13 @@ class FenchelSolver:
             TensorDataset(all_inputs, all_labels, all_ids),
             batch_size=batch_size, shuffle=shuffle)
 
-    def get_optimizer(self, learning_rate, momentum, weight_decay):
+    def get_optimizer(self, classification_lr, influence_lr, momentum, weight_decay):
         self._optimizer_theta3 = optim.SGD(
             self._classification_model.parameters(),
-            lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
+            lr=classification_lr, momentum=momentum, weight_decay=weight_decay)
         self._optimizer_theta1 = optim.SGD(
             self._influence_model.parameters(),
-            lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
+            lr=influence_lr, momentum=momentum, weight_decay=weight_decay)
 
     def pretrain_epoch(self):
         self.train_epoch(is_pretrain=True)

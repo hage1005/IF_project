@@ -91,6 +91,7 @@ def main(args):
 
     fenchen_classifier.get_optimizer(
         args.classification_lr,
+        args.influence_lr,
         args.classification_momentum,
         args.classification_weight_decay)
 

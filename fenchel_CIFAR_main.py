@@ -21,7 +21,7 @@ import wandb
 import yaml
 
 os.chdir('/home/xiaochen/kewen/IF_project')
-YAMLPath = 'src/config/cifar10/exp01.yaml'
+YAMLPath = 'src/config/cifar10/default.yaml'
 # YAMLPath = 'src/config/cifar10/good_config/8.yaml'
 
 def main(args):
@@ -140,11 +140,11 @@ def main(args):
 
 
 if __name__ == "__main__":
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument("--YAMLPath", type=str)
-    # args = parser.parse_args()
-    # if args.YAMLPath:
-    #     YAMLPath = args.YAMLPath
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--YAMLPath", type=str)
+    args, unknown = parser.parse_known_args()
+    if args.YAMLPath:
+        YAMLPath = args.YAMLPath
 
     with open(YAMLPath) as file:
         config = yaml.safe_load(file)

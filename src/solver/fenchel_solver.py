@@ -80,7 +80,7 @@ class FenchelSolver:
         criterion = nn.CrossEntropyLoss(reduction='none')
         pbar = tqdm(self._data_loader['train'], desc='Training Epoch')
 
-        for batch in pbar:
+        for batch_idx, batch in enumerate(pbar):
             inputs, labels, ids = tuple(t.to('cuda') for t in batch)
             self.global_iter += 1
 
@@ -92,9 +92,9 @@ class FenchelSolver:
             wandb.log({'weights_variance': weights_variance})
             self._optimizer_theta1.zero_grad()
 
-            loss_influence = torch.sum(self._influence_model(inputs, labels).flatten(
-            ) * weights) - torch.mean(self._influence_model(inputs, labels).flatten())
-            # loss_influence = torch.log(loss_influence+10)
+            if_score = self._influence_model(inputs, labels).flatten()
+            loss_influence = torch.sum(if_score * weights) - torch.mean(if_score)
+
             loss_influence.backward()  # theta 1 update, todo: does weights change?
             self._optimizer_theta1.step()
 

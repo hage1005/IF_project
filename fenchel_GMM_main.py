@@ -116,7 +116,7 @@ def main(args):
         # table = wandb.Table(data=helpful_data, columns = ["x", "class"])
         # wandb.log({f"helpful_data_epoch{epoch}" : wandb.plot.scatter(table,
         #                             "x", "class")})
-        wandb.log({'total_weight_variance': torch.var(
+        wandb.log({'total_weight_std': torch.std(
             fenchen_classifier._weights).item()})
 
         """Start Ploting"""

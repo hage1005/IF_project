@@ -11,6 +11,8 @@ from torch.utils.data import TensorDataset, DataLoader
 from torchvision import models
 
 from .magic_module import MagicModule
+from src.solver.utils import linear_normalize, softmax_normalize
+
 import wandb
 
 EPSILON = 1e-5
@@ -25,7 +27,8 @@ class FenchelSolver:
             influence_model,
             pretrained=True,
             softmax_temp=1.,
-            train_classification_till_converge=False):
+            train_classification_till_converge=False,
+            clip_min_weight=True):
 
         self._influence_model = influence_model
         self._classification_model = classification_model
@@ -47,6 +50,7 @@ class FenchelSolver:
         self.y_test = y_test.to('cuda')
 
         self.train_classification_till_converge = train_classification_till_converge
+        self.clip_min_weight = clip_min_weight
 
     def init_weights(self, n_examples, w_init, w_decay):
         self._weights = torch.tensor(
@@ -64,13 +68,15 @@ class FenchelSolver:
             TensorDataset(all_inputs, all_labels, all_ids),
             batch_size=batch_size, shuffle=shuffle)
 
-    def get_optimizer(self, classification_lr, influence_lr, momentum, weight_decay):
-        self._optimizer_theta3 = optim.SGD(
-            self._classification_model.parameters(),
-            lr=classification_lr, momentum=momentum, weight_decay=weight_decay)
+    def get_optimizer_influence(self, lr, momentum, weight_decay):
         self._optimizer_theta1 = optim.SGD(
             self._influence_model.parameters(),
-            lr=influence_lr, momentum=momentum, weight_decay=weight_decay)
+            lr=lr, momentum=momentum, weight_decay=weight_decay)
+
+    def get_optimizer_classification(self, lr, momentum, weight_decay):
+        self._optimizer_theta3 = optim.SGD(
+            self._classification_model.parameters(),
+            lr=lr, momentum=momentum, weight_decay=weight_decay)
 
     def pretrain_epoch(self):
         self.train_epoch(is_pretrain=True)
@@ -88,13 +94,12 @@ class FenchelSolver:
                 self._weights[ids].detach(),
                 temperature=self._softmax_temp)
 
-            weights_variance = torch.var(weights)
-            wandb.log({'weights_variance': weights_variance})
+            wandb.log({'weights_std': torch.std(weights), 'batch_idx': batch_idx, 'epoch': self.global_epoch})
             self._optimizer_theta1.zero_grad()
 
-            if_score = self._influence_model(inputs, labels).flatten()
-            loss_influence = torch.sum(if_score * weights) - torch.mean(if_score)
-
+            loss_influence = torch.sum(self._influence_model(inputs, labels).flatten(
+            ) * weights) - torch.mean(self._influence_model(inputs, labels).flatten())
+            # loss_influence = torch.log(loss_influence+10)
             loss_influence.backward()  # theta 1 update, todo: does weights change?
             self._optimizer_theta1.step()
 
@@ -194,18 +199,22 @@ class FenchelSolver:
         weights_tmp = softmax_normalize(
             weights,
             temperature=self._softmax_temp)
-        infTerm = test_loss - \
-            torch.sum(self._influence_model(inputs, labels).squeeze().detach() * weights_tmp)
 
+        weighted_influence = torch.sum(self._influence_model(inputs, labels).squeeze().detach() * weights_tmp)
+        infTerm = test_loss - weighted_influence
+            
         weights_grad = torch.autograd.grad(
             infTerm, weights, retain_graph=True)[0]
         weights_grad_list.append(weights_grad)
 
         weights_grad = sum(weights_grad_list)
+        wandb.log({'test_loss': test_loss, 'weighted_influence': weighted_influence, 'weights_grad_std': torch.std(weights_grad), 'weights_grad_mean_abs': torch.mean(torch.abs(weights_grad))})
 
         self._weights[ids] = weights.data / self._w_decay - weights_grad
-        self._weights[ids] = torch.max(self._weights[ids], torch.ones_like(
-            self._weights[ids]).fill_(EPSILON))
+
+        if self.clip_min_weight:
+            self._weights[ids] = torch.max(self._weights[ids], torch.ones_like(
+                self._weights[ids]).fill_(EPSILON))
 
         if self._weights[ids].data[0] == torch.inf or self._weights[ids].data[0].isnan(
         ):
@@ -261,12 +270,4 @@ class FenchelSolver:
             print("=> no checkpoint found at '{}'".format(file_path))
 
 
-def linear_normalize(weights):
-    weights = torch.max(weights, torch.zeros_like(weights))
-    if torch.sum(weights) > 1e-8:
-        return weights / torch.sum(weights)
-    return torch.zeros_like(weights)
 
-
-def softmax_normalize(weights, temperature):
-    return nn.functional.softmax(weights / temperature, dim=0)

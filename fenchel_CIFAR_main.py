@@ -86,14 +86,18 @@ def main(args):
 
     fenchen_classifier.init_weights(
         n_examples=len(train_dataset),
-        w_init=args.influence_weight_init,
-        w_decay=args.influence_weight_decay)
+        w_init=args.dataWeight_weight_init,
+        w_decay=args.dataWeight_weight_decay)
 
-    fenchen_classifier.get_optimizer(
+    fenchen_classifier.get_optimizer_classification(
         args.classification_lr,
-        args.influence_lr,
         args.classification_momentum,
         args.classification_weight_decay)
+    
+    fenchen_classifier.get_optimizer_influence(
+        args.influence_lr,
+        args.influence_momentum,
+        args.influence_weight_decay)
 
     for epoch in range(args.max_epoch):
         fenchen_classifier.train_epoch()
@@ -118,7 +122,7 @@ def main(args):
             f"IF_{args.dataset_name}_testid_{args.test_id_num}_epoch_{epoch}.json")
         save_json(result, json_path)
 
-        wandb.log({'total_weight_variance': torch.var(
+        wandb.log({'total_weight_std': torch.std(
             fenchen_classifier._weights).item()})
 
         fig = plt.figure(figsize=(6, 7))

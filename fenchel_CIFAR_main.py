@@ -65,7 +65,7 @@ def main(args):
     else:
         raise NotImplementedError()
 
-    fenchen_classifier = FenchelSolver(
+    fenchel_classifier = FenchelSolver(
         x_test,
         y_test,
         classification_model=classification_model,
@@ -73,35 +73,47 @@ def main(args):
         softmax_temp=args.softmax_temp,
         train_classification_till_converge=args.train_classification_till_converge)
 
-    fenchen_classifier.load_data(
+    fenchel_classifier.load_data(
         "train",
         train_dataset,
         args.batch_size,
         shuffle=True)
-    fenchen_classifier.load_data(
+    fenchel_classifier.load_data(
         "test",
         test_dataset,
         args.batch_size,
         shuffle=False)
 
-    fenchen_classifier.init_weights(
+    fenchel_classifier.init_weights(
         n_examples=len(train_dataset),
         w_init=args.dataWeight_weight_init,
         w_decay=args.dataWeight_weight_decay)
 
-    fenchen_classifier.get_optimizer_classification(
+    fenchel_classifier.get_optimizer_classification(
         args.classification_lr,
         args.classification_momentum,
         args.classification_weight_decay)
     
-    fenchen_classifier.get_optimizer_influence(
+    fenchel_classifier.get_optimizer_influence(
         args.influence_lr,
         args.influence_momentum,
         args.influence_weight_decay)
 
+    if not os.path.exists(args._ckpt_dir + args._pretrain_ckpt_name):
+        for epoch in range(20):
+            fenchel_classifier.pretrain_epoch()
+            test_acc = fenchel_classifier.evaluate('test')
+            print('Pre-train Epoch {}, Test Acc: {:.4f}'.format(
+                epoch, 100. * test_acc))
+            fenchel_classifier.save_checkpoint_classification(args._ckpt_dir + args._pretrain_ckpt_name)
+
+    if args.use_pretrain_classification:
+        fenchel_classifier.load_checkpoint_classification(args._ckpt_dir + args._pretrain_ckpt_name)
+
     for epoch in range(args.max_epoch):
-        fenchen_classifier.train_epoch()
-        fenchen_classifier.save_checkpoint(args._ckpt_dir + args._ckpt_name)
+        if args.reset_pretrain_classification_every_epoch and epoch > 0:
+            fenchel_classifier.load_checkpoint_classification(args._ckpt_dir + args._pretrain_ckpt_name)
+        fenchel_classifier.train_epoch()
         result = {}
 
         train_dataset_size = len(train_dataset)
@@ -123,7 +135,7 @@ def main(args):
         save_json(result, json_path)
 
         wandb.log({'total_weight_std': torch.std(
-            fenchen_classifier._weights).item()})
+            fenchel_classifier._weights).item()})
 
         fig = plt.figure(figsize=(6, 7))
         for i in range(1, 10):

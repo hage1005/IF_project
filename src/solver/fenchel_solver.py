@@ -33,7 +33,7 @@ class FenchelSolver:
         self._influence_model = influence_model
         self._classification_model = classification_model
 
-        self._optimizer_theta3 = None
+        self._optimizer_classification = None
 
         self._dataset = {}
         self._data_loader = {}
@@ -69,12 +69,12 @@ class FenchelSolver:
             batch_size=batch_size, shuffle=shuffle)
 
     def get_optimizer_influence(self, lr, momentum, weight_decay):
-        self._optimizer_theta1 = optim.SGD(
+        self._optimizer_influence = optim.SGD(
             self._influence_model.parameters(),
             lr=lr, momentum=momentum, weight_decay=weight_decay)
 
     def get_optimizer_classification(self, lr, momentum, weight_decay):
-        self._optimizer_theta3 = optim.SGD(
+        self._optimizer_classification = optim.SGD(
             self._classification_model.parameters(),
             lr=lr, momentum=momentum, weight_decay=weight_decay)
 
@@ -95,13 +95,13 @@ class FenchelSolver:
                 temperature=self._softmax_temp)
 
             wandb.log({'weights_std': torch.std(weights), 'batch_idx': batch_idx, 'epoch': self.global_epoch})
-            self._optimizer_theta1.zero_grad()
+            self._optimizer_influence.zero_grad()
 
             loss_influence = torch.sum(self._influence_model(inputs, labels).flatten(
             ) * weights) - torch.mean(self._influence_model(inputs, labels).flatten())
             # loss_influence = torch.log(loss_influence+10)
             loss_influence.backward()  # theta 1 update, todo: does weights change?
-            self._optimizer_theta1.step()
+            self._optimizer_influence.step()
 
             if is_pretrain:
                 weights = linear_normalize(
@@ -111,7 +111,7 @@ class FenchelSolver:
                     self._get_weights(batch),
                     temperature=self._softmax_temp)  # theta 2 update
 
-            self._optimizer_theta3.zero_grad()
+            self._optimizer_classification.zero_grad()
             lossHistory = []
             while True:
                 logits = self._classification_model(inputs)
@@ -119,7 +119,7 @@ class FenchelSolver:
                 loss_classification = torch.sum(
                     loss_classification * weights.data)
                 loss_classification.backward()  # theta 3 update
-                self._optimizer_theta3.step()
+                self._optimizer_classification.step()
                 if loss_classification.isnan() or not self.train_classification_till_converge:
                     break
                 lossHistory.append(loss_classification)
@@ -148,7 +148,7 @@ class FenchelSolver:
         criterion = nn.CrossEntropyLoss()
 
         model_tmp = copy.deepcopy(self._classification_model)
-        optimizer_hparams = self._optimizer_theta3.state_dict()[
+        optimizer_hparams = self._optimizer_classification.state_dict()[
             'param_groups'][0]
         optimizer_tmp = optim.SGD(
             model_tmp.parameters(),
@@ -158,7 +158,7 @@ class FenchelSolver:
 
         for i in range(batch_size):
             model_tmp.load_state_dict(self._classification_model.state_dict())
-            optimizer_tmp.load_state_dict(self._optimizer_theta3.state_dict())
+            optimizer_tmp.load_state_dict(self._optimizer_classification.state_dict())
 
             model_tmp.zero_grad()
 
@@ -195,7 +195,7 @@ class FenchelSolver:
         test_logits = magic_model(self.x_test)  # this part is magic_module
         test_loss = criterion(test_logits,
                               self.y_test.long())  # the third term
-
+    
         weights_tmp = softmax_normalize(
             weights,
             temperature=self._softmax_temp)
@@ -243,9 +243,9 @@ class FenchelSolver:
 
         return torch.sum(preds_all == labels_all).item() / labels_all.shape[0]
 
-    def save_checkpoint(self, file_path, silent=True):
-        model_states = {'net': self._influence_model.state_dict(), }
-        optim_states = {'optim': self._optimizer_theta1.state_dict(), }
+    def save_checkpoint_classification(self, file_path, silent=True):
+        model_states = {'classification': self._classification_model.state_dict(), }
+        optim_states = {'classification': self._optimizer_classification.state_dict(), }
         states = {'epoch': self.global_epoch,
                   'model_states': model_states,
                   'optim_states': optim_states}
@@ -256,18 +256,16 @@ class FenchelSolver:
                 "=> saved checkpoint '{}' (iter {})".format(
                     file_path, self.global_iter))
 
-    def load_checkpoint(self, file_path):
+    def load_checkpoint_classification(self, file_path):
         if os.path.isfile(file_path):
-            checkpoint = torch.load(file_path,
-                                    map_location='cuda:{}'.format(self.gpu))
+            checkpoint = torch.load(file_path, map_location='cuda')
             self.global_epoch = checkpoint['epoch']
-            self.net.load_state_dict(checkpoint['model_states']['net'])
-            self.optim.load_state_dict(checkpoint['optim_states']['optim'])
+            self._classification_model.load_state_dict(checkpoint['model_states']['classification'])
+            self._optimizer_classification.load_state_dict(checkpoint['optim_states']['classification'])
             print(
                 "=> loaded checkpoint '{} (epoch {})'".format(
                     file_path, self.global_epoch))
         else:
             print("=> no checkpoint found at '{}'".format(file_path))
-
 
 

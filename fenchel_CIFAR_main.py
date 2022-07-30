@@ -156,9 +156,9 @@ if __name__ == "__main__":
         wandb.init(
             project="IF_PROJECT",
             name=f"{config['dataset_name']}_testId{config['test_id_num']}",
-            settings=wandb.Settings(code_dir="src"),
             config=config
         )
+        wandb.run.log_code(".", include_fn=lambda path: path.endswith(".py"))
         os.environ["CUDA_VISIBLE_DEVICES"] = str(config["_gpu_id"])
 
     main(wandb.config)

@@ -175,6 +175,7 @@ if __name__ == "__main__":
             name=f"{config['dataset_name']}_testId{config['test_id_num']}_IFlr{config['influence_lr']}_IFlr{config['classification_lr']}_IFwd{config['classification_weight_decay']}_IFmomentum{config['classification_momentum']}_IFdecay{config['influence_weight_decay']}_softmaxTemp{config['softmax_temp']}",
             config=config
         )
+        wandb.run.log_code(".", include_fn=lambda path: path.endswith(".py"))
         # os.environ["CUDA_VISIBLE_DEVICES"] = str(config["_gpu_id"])
 
     main(wandb.config)

@@ -166,7 +166,7 @@ if __name__ == "__main__":
     with open(YAMLPath) as file:
         config = yaml.safe_load(file)
         wandb.init(
-            project="IF_PROJECT",
+            project="IF_PROJECT_single_test",
             name=f"{config['dataset_name']}_testId{config['test_id_num']}",
             config=config
         )

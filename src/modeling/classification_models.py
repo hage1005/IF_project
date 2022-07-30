@@ -35,3 +35,16 @@ class LogisticRegression(nn.Module):
     def forward(self, x):
         outputs = torch.sigmoid(self.linear(x))
         return outputs
+
+class MNIST_1(nn.Module):
+  def __init__(self, hidden_size, num_classes):
+    super(MNIST_1, self).__init__()
+    self.l1 = nn.Linear(28*28, hidden_size)
+    self.relu = nn.ReLU()
+    self.l2 = nn.Linear(hidden_size, num_classes)
+  
+  def forward(self, x):
+    out = self.l1(x.reshape(-1, 28*28))
+    out = self.relu(out)
+    out = self.l2(out)
+    return out

@@ -41,7 +41,7 @@ def main(args):
     else:
         raise NotImplementedError()
 
-    x_test, y_test = test_dataset[args.test_id_num:args.test_id_num + 1]
+    x_test, y_test = test_dataset[args.dev_id_num:args.dev_id_num + 1]
     # x_test, y_test = torch.FloatTensor([[x_test]]), torch.IntTensor([y_test])
     wandb.run.summary['x_test'] = str(x_test.tolist())
     wandb.run.summary['y_test'] = str(y_test.tolist())
@@ -108,7 +108,7 @@ def main(args):
         json_path = os.path.join(
             "outputs",
             args.dataset_name,
-            f"IF_{args.dataset_name}_testid_{args.test_id_num}_epoch_{epoch}.json")
+            f"IF_{args.dataset_name}_testid_{args.dev_id_num}_epoch_{epoch}.json")
         save_json(result, json_path)
 
         # wandb doesn't support legend somehow
@@ -172,7 +172,7 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
         wandb.init(
             project="IF_PROJECT",
-            name=f"{config['dataset_name']}_testId{config['test_id_num']}_IFlr{config['influence_lr']}_IFlr{config['classification_lr']}_IFwd{config['classification_weight_decay']}_IFmomentum{config['classification_momentum']}_IFdecay{config['influence_weight_decay']}_softmaxTemp{config['softmax_temp']}",
+            name=f"{config['dataset_name']}_testId{config['dev_id_num']}_IFlr{config['influence_lr']}_IFlr{config['classification_lr']}_IFwd{config['classification_weight_decay']}_IFmomentum{config['classification_momentum']}_IFdecay{config['influence_weight_decay']}_softmaxTemp{config['softmax_temp']}",
             config=config
         )
         wandb.run.log_code(".", include_fn=lambda path: path.endswith(".py"))

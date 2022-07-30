@@ -21,10 +21,11 @@ EPSILON = 1e-5
 class FenchelSolver:
     def __init__(
             self,
-            x_test,
-            y_test,
+            x_dev,
+            y_dev,
             classification_model,
             influence_model,
+            is_influence_model_hashmap,
             pretrained=True,
             softmax_temp=1.,
             train_classification_till_converge=False,
@@ -46,11 +47,12 @@ class FenchelSolver:
         self.global_iter = 0
         self.global_epoch = 0
 
-        self.x_test = x_test.to('cuda')
-        self.y_test = y_test.to('cuda')
+        self.x_dev = x_dev.to('cuda')
+        self.y_dev = y_dev.to('cuda')
 
         self.train_classification_till_converge = train_classification_till_converge
         self.clip_min_weight = clip_min_weight
+        self.is_influence_model_hashmap = is_influence_model_hashmap
 
     def init_weights(self, n_examples, w_init, w_decay):
         self._weights = torch.tensor(
@@ -96,9 +98,11 @@ class FenchelSolver:
 
             wandb.log({'weights_std': torch.std(weights), 'batch_idx': batch_idx, 'epoch': self.global_epoch})
             self._optimizer_influence.zero_grad()
-
-            loss_influence = torch.sum(self._influence_model(inputs, labels).flatten(
-            ) * weights) - torch.mean(self._influence_model(inputs, labels).flatten())
+            if self.is_influence_model_hashmap:
+                IF_score = self._influence_model(ids).flatten()
+            else:
+                IF_score = self._influence_model(inputs, labels).flatten()
+            loss_influence = torch.sum(IF_score * weights) - torch.mean(IF_score)
             # loss_influence = torch.log(loss_influence+10)
             loss_influence.backward()  # theta 1 update, todo: does weights change?
             self._optimizer_influence.step()
@@ -184,31 +188,31 @@ class FenchelSolver:
 
         # TODO remove this
         weights_grad_list = []
-        # for step, batch in enumerate(self._data_loader['train']):
-        batch = (t.to('cuda') for t in batch)
-        train_inputs, train_labels, _ = batch
-        batch_size = train_labels.shape[0]
+        batch_size = labels.shape[0]
 
         if weights.grad is not None:
             weights.grad.zero_()
         magic_model.eval()  # batchnorm will give error if we don't do this
-        test_logits = magic_model(self.x_test)  # this part is magic_module
-        test_loss = criterion(test_logits,
-                              self.y_test.long())  # the third term
+        dev_logits = magic_model(self.x_dev)  # this part is magic_module
+        dev_loss = criterion(dev_logits,
+                              self.y_dev.long())  # the third term
     
         weights_tmp = softmax_normalize(
             weights,
             temperature=self._softmax_temp)
 
-        weighted_influence = torch.sum(self._influence_model(inputs, labels).squeeze().detach() * weights_tmp)
-        infTerm = test_loss - weighted_influence
+        if self.is_influence_model_hashmap:
+            weighted_influence = torch.sum(self._influence_model(ids).squeeze().detach() * weights_tmp)
+        else:
+            weighted_influence = torch.sum(self._influence_model(inputs, labels).squeeze().detach() * weights_tmp)
+        infTerm = dev_loss - weighted_influence
             
         weights_grad = torch.autograd.grad(
             infTerm, weights, retain_graph=True)[0]
         weights_grad_list.append(weights_grad)
 
         weights_grad = sum(weights_grad_list)
-        wandb.log({'test_loss': test_loss, 'weighted_influence': weighted_influence, 'weights_grad_std': torch.std(weights_grad), 'weights_grad_mean_abs': torch.mean(torch.abs(weights_grad))})
+        wandb.log({'dev_loss': dev_loss, 'weighted_influence': weighted_influence, 'weights_grad_std': torch.std(weights_grad), 'weights_grad_mean_abs': torch.mean(torch.abs(weights_grad))})
 
         self._weights[ids] = weights.data / self._w_decay - weights_grad
 

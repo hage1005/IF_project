@@ -176,6 +176,7 @@ if __name__ == "__main__":
             config=config
         )
         wandb.run.log_code(".", include_fn=lambda path: path.endswith(".py"))
-        # os.environ["CUDA_VISIBLE_DEVICES"] = str(config["_gpu_id"])
+        if "CUDA_VISIBLE_DEVICES" not in os.environ:
+            os.environ["CUDA_VISIBLE_DEVICES"] = str(config["_gpu_id"])
 
     main(wandb.config)

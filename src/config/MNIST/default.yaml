@@ -1,9 +1,9 @@
 exp_title: original_config
-dataset_name: cifar10
-train_classes: ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
+dataset_name: mnist
+train_classes: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 num_per_class: [100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
-classification_model: Resnet34
-influence_model: Net_IF
+classification_model: MNIST_1
+influence_model: MNIST_IF_1
 max_epoch: 30
 influence_lr: 0.1
 influence_momentum: 0.9
@@ -12,20 +12,22 @@ classification_lr: 0.001
 classification_momentum: 0.9
 classification_weight_decay: 0.01
 batch_size: 32
+_hidden_size_classification: 32
+_hidden_size_influence: 32
 dataWeight_weight_decay: 1
 dataWeight_weight_init: 0.
 softmax_temp: 10
 train_classification_till_converge: False
 use_pretrain_classification: True
 reset_pretrain_classification_every_epoch: False
-dev_id_num: 0
-dev_original_folder: data/cifar10/test/original_sampled
-dev_transformed_folder: data/cifar10/test/transformed_sampled
+dev_id_num: 1
+dev_original_folder: data/MNIST/dev/oneClassEach/original_sampled
+dev_transformed_folder: data/MNIST/dev/oneClassEach/transformed_sampled
 test_original_folder: ""
 test_transformed_folder: ""
 seed: 1
 _gpu_id: 6
 _ckpt_dir: checkpoints/fenchel/
-_pretrain_ckpt_name: single_test_seed_1_first1000_shuffled.pt
+_pretrain_ckpt_name: seed_1_first1000_shuffled.pt
 _num_class: 10
 _ckpt_name: last

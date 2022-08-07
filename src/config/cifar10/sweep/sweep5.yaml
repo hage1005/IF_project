@@ -1,0 +1,14 @@
+# wandb agent hage1005/IF_PROJECT_single_test/pbga59sh
+program: fenchel_CIFAR_main.py
+project: IF_PROJECT_single_test
+method: bayes
+metric:
+  name: total_weight_variance
+  goal: minimize
+parameters:
+  test_id_num:
+    values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  influence_lr:
+    value: 0.1
+  influence_weight_decay:
+    value: 0

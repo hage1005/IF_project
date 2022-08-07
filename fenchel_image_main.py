@@ -1,6 +1,7 @@
 import argparse
 import os
 import random
+from tkinter import Image
 from matplotlib import pyplot as plt
 from sklearn.utils import shuffle
 from tqdm import tqdm
@@ -10,18 +11,18 @@ import numpy as np
 import torch
 
 from torchvision import models
+from src.data_utils.MnistDataset import MnistDataset
 from src.utils.utils import save_json
-from src.data_utils.cifar10 import get_cifar10_train, get_cifar10_test
+from src.data_utils.Cifar10Dataset import Cifar10Dataset
 from src.solver.fenchel_solver import FenchelSolver
-from src.modeling.classification_models import CnnCifar
-from src.modeling.influence_models import Net_IF
-from src.data_utils.cifar10_label_class_map import CLASS_MAP, cifar_class_label_dict
+from src.modeling.classification_models import CnnCifar, MNIST_1
+from src.modeling.influence_models import Net_IF, MNIST_IF_1
 
 import wandb
 import yaml
 
 os.chdir('/home/xiaochen/kewen/IF_project')
-YAMLPath = 'src/config/cifar10/default.yaml'
+YAMLPath = 'src/config/MNIST/default.yaml'
 # YAMLPath = 'src/config/cifar10/good_config/8.yaml'
 
 def main(args):
@@ -38,36 +39,52 @@ def main(args):
         y = torch.LongTensor([y])
         return x, y
 
-    train_classes = [cifar_class_label_dict[c] for c in args.train_classes]
+    if args.dataset_name == 'cifar10':
+        Dataset = Cifar10Dataset
+    elif args.dataset_name == 'mnist':
+        Dataset = MnistDataset
+    else:
+        raise NotImplementedError()
 
-    train_dataset, train_dataset_no_transform = get_cifar10_train(
-        classes=train_classes, num_per_class=args.num_per_class)
-    test_dataset, test_dataset_no_transform = get_cifar10_test()
+    class_label_dict = Dataset.get_class_label_dict()
+    CLASS_MAP = Dataset.get_class_map()
+    train_classes = [class_label_dict[c] for c in args.train_classes]
+    ImageDataset = Dataset(args.dev_original_folder, args.dev_transformed_folder, args.test_original_folder, args.test_transformed_folder, train_classes, args.num_per_class)
 
-    x_test, y_test = get_single_image_from_dataset(
-        test_dataset, args.test_id_num)
+
+    train_dataset, train_dataset_no_transform = ImageDataset.get_train()
+    dev_dataset, dev_dataset_no_transform = ImageDataset.get_dev()
+    # test_dataset, test_dataset_no_transform = ImageDataset.get_test()
+
+
+    x_dev, y_dev = get_single_image_from_dataset(
+        dev_dataset, args.dev_id_num)
 
     wandb.run.summary['test_image'] = wandb.Image(
-        x_test, caption={'label': CLASS_MAP[y_test.item()]})
+        x_dev, caption={'label': CLASS_MAP[y_dev.item()]})
 
     if args.classification_model == 'Resnet34':
         classification_model = models.resnet34(pretrained=True).to('cuda')
         classification_model.fc = torch.nn.Linear(
             classification_model.fc.in_features,
-            args._num_class).to('cuda')
+            10).to('cuda')
     elif args.classification_model == 'CnnCifar':
         classification_model = CnnCifar().to('cuda')
+    elif args.classification_model == 'MNIST_1':
+        classification_model = MNIST_1(args._hidden_size_classification, 10).to('cuda')
     else:
         raise NotImplementedError()
 
     if args.influence_model == 'Net_IF':
-        influence_model = Net_IF(args._num_class).to('cuda')
+        influence_model = Net_IF(10).to('cuda')
+    elif args.influence_model == 'MNIST_IF_1':
+        influence_model = MNIST_IF_1(args._hidden_size_influence, 10).to('cuda')
     else:
         raise NotImplementedError()
 
     fenchel_classifier = FenchelSolver(
-        x_test,
-        y_test,
+        x_dev,
+        y_dev,
         classification_model=classification_model,
         influence_model=influence_model,
         softmax_temp=args.softmax_temp,
@@ -79,10 +96,15 @@ def main(args):
         args.batch_size,
         shuffle=True)
     fenchel_classifier.load_data(
-        "test",
-        test_dataset,
+        "dev",
+        dev_dataset,
         args.batch_size,
         shuffle=False)
+    # fenchel_classifier.load_data(
+    #     "test",
+    #     test_dataset
+    #     args.batch_size,
+    #     shuffle=False)
 
     fenchel_classifier.init_weights(
         n_examples=len(train_dataset),
@@ -131,7 +153,7 @@ def main(args):
         json_path = os.path.join(
             "outputs",
             args.dataset_name,
-            f"IF_{args.dataset_name}_testid_{args.test_id_num}_epoch_{epoch}.json")
+            f"IF_{args.dataset_name}_devId_{args.dev_id_num}_epoch_{epoch}.json")
         save_json(result, json_path)
 
         wandb.log({'total_weight_std': torch.std(
@@ -143,7 +165,7 @@ def main(args):
             fig.add_subplot(3, 3, i)
             plt.title(f"{CLASS_MAP[y]}_{influences[helpful[i]]:.2f}")
             plt.imshow(x.permute(1, 2, 0))
-        wandb.log({f"helpful_image_for_{CLASS_MAP[y_test.item()]}": fig})
+        wandb.log({f"helpful_image_for_{CLASS_MAP[y_dev.item()]}": fig})
 
         plt.clf()
         fig = plt.figure(figsize=(6, 7))
@@ -152,7 +174,7 @@ def main(args):
             fig.add_subplot(3, 3, i)
             plt.title(f"{CLASS_MAP[y]}_{influences[harmful[i]]:.2f}")
             plt.imshow(x.permute(1, 2, 0))
-        wandb.log({f"harmful_image_for_{CLASS_MAP[y_test.item()]}": fig})
+        wandb.log({f"harmful_image_for_{CLASS_MAP[y_dev.item()]}": fig})
         plt.clf()
 
 
@@ -167,7 +189,7 @@ if __name__ == "__main__":
         config = yaml.safe_load(file)
         wandb.init(
             project="IF_PROJECT_single_test",
-            name=f"{config['dataset_name']}_testId{config['test_id_num']}",
+            name=f"{config['dataset_name']}_devId{config['dev_id_num']}",
             config=config
         )
         wandb.run.log_code(".", include_fn=lambda path: path.endswith(".py"))

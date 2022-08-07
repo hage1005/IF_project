@@ -35,3 +35,24 @@ class Linear_IF(nn.Module):
     def forward(self, x, y):
         outputs = self.linear(x)
         return torch.gather(outputs, 1, y.unsqueeze(1))
+
+class MNIST_IF_1(nn.Module):
+    def __init__(self, hidden_size, num_classes):
+        super(MNIST_IF_1, self).__init__()
+        self.l1 = nn.Linear(28*28, hidden_size)
+        self.relu = nn.ReLU()
+        self.l2 = nn.Linear(hidden_size, num_classes)
+  
+    def forward(self, x, y):
+        out = self.l1(x.reshape(-1, 28*28))
+        out = self.relu(out)
+        out = self.l2(out)
+        return torch.gather(x, 1, y.view(-1, 1))
+class hashmap_IF(nn.Module):
+    def __init__(self, num_sample):
+        super(hashmap_IF, self).__init__()
+        self.num_sample = num_sample
+        self.map = torch.nn.Parameter(torch.zeros(num_sample))
+
+    def forward(self, id):
+        return self.map[id]

@@ -21,8 +21,8 @@ EPSILON = 1e-5
 class FenchelSolver:
     def __init__(
             self,
-            x_test,
-            y_test,
+            x_dev,
+            y_dev,
             classification_model,
             influence_model,
             pretrained=True,
@@ -46,8 +46,8 @@ class FenchelSolver:
         self.global_iter = 0
         self.global_epoch = 0
 
-        self.x_test = x_test.to('cuda')
-        self.y_test = y_test.to('cuda')
+        self.x_dev = x_dev.to('cuda')
+        self.y_dev = y_dev.to('cuda')
 
         self.train_classification_till_converge = train_classification_till_converge
         self.clip_min_weight = clip_min_weight
@@ -98,7 +98,7 @@ class FenchelSolver:
             self._optimizer_influence.zero_grad()
 
             loss_influence = torch.sum(self._influence_model(inputs, labels).flatten(
-            ) * weights) - torch.mean(self._influence_model(inputs, labels).flatten())
+            ) * weights) - torch.mean(self._influence_model(ba, labels).flatten())
             # loss_influence = torch.log(loss_influence+10)
             loss_influence.backward()  # theta 1 update, todo: does weights change?
             self._optimizer_influence.step()
@@ -192,9 +192,9 @@ class FenchelSolver:
         if weights.grad is not None:
             weights.grad.zero_()
         magic_model.eval()  # batchnorm will give error if we don't do this
-        test_logits = magic_model(self.x_test)  # this part is magic_module
+        test_logits = magic_model(self.x_dev)  # this part is magic_module
         test_loss = criterion(test_logits,
-                              self.y_test.long())  # the third term
+                              self.y_dev.long())  # the third term
     
         weights_tmp = softmax_normalize(
             weights,

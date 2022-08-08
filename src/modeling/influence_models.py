@@ -47,7 +47,7 @@ class MNIST_IF_1(nn.Module):
         out = self.l1(x.reshape(-1, 28*28))
         out = self.relu(out)
         out = self.l2(out)
-        return torch.gather(x, 1, y.view(-1, 1))
+        return torch.gather(out, 1, y.view(-1, 1))
 class hashmap_IF(nn.Module):
     def __init__(self, num_sample):
         super(hashmap_IF, self).__init__()
@@ -56,3 +56,6 @@ class hashmap_IF(nn.Module):
 
     def forward(self, id):
         return self.map[id]
+
+    def get_all_influence(self):
+        return self.map.reshape(-1)

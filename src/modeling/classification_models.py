@@ -44,7 +44,7 @@ class MNIST_1(nn.Module):
     self.l2 = nn.Linear(hidden_size, num_classes)
   
   def forward(self, x):
-    out = self.l1(x)
+    out = self.l1(x.reshape(-1, 28*28))
     out = self.relu(out)
     out = self.l2(out)
     return out

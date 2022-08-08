@@ -3,9 +3,9 @@ dataset_name: mnist
 train_classes: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 num_per_class: [100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
 classification_model: MNIST_1
-influence_model: MNIST_IF_1
+influence_model: hashmap_IF
 max_epoch: 30
-influence_lr: 0.1
+influence_lr: 1
 influence_momentum: 0.9
 influence_weight_decay: 0.01
 classification_lr: 0.001
@@ -31,5 +31,5 @@ _ckpt_dir: checkpoints/fenchel/mnist
 seed: 1
 _pretrain_ckpt_name: seed_1_first1000_shuffled.pt #modify together
 
-_num_class: 10
+_num_class: 10 # the maximum number of class
 _ckpt_name: last

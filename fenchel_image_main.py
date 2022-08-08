@@ -16,13 +16,13 @@ from src.utils.utils import save_json
 from src.data_utils.Cifar10Dataset import Cifar10Dataset
 from src.solver.fenchel_solver import FenchelSolver
 from src.modeling.classification_models import CnnCifar, MNIST_1
-from src.modeling.influence_models import Net_IF, MNIST_IF_1
+from src.modeling.influence_models import Net_IF, MNIST_IF_1, hashmap_IF
 
 import wandb
 import yaml
 
 os.chdir('/home/xiaochen/kewen/IF_project')
-YAMLPath = 'src/config/MNIST/default.yaml'
+YAMLPath = 'src/config/MNIST/single_test/exp/2.yaml'
 # YAMLPath = 'src/config/cifar10/good_config/8.yaml'
 
 def main(args):
@@ -55,7 +55,7 @@ def main(args):
     train_dataset, train_dataset_no_transform = ImageDataset.get_train()
     dev_dataset, dev_dataset_no_transform = ImageDataset.get_dev()
     # test_dataset, test_dataset_no_transform = ImageDataset.get_test()
-
+    train_dataset_size = len(train_dataset)
 
     x_dev, y_dev = get_single_image_from_dataset(
         dev_dataset, args.dev_id_num)
@@ -67,18 +67,22 @@ def main(args):
         classification_model = models.resnet34(pretrained=True).to('cuda')
         classification_model.fc = torch.nn.Linear(
             classification_model.fc.in_features,
-            10).to('cuda')
+            args._num_class).to('cuda')
     elif args.classification_model == 'CnnCifar':
-        classification_model = CnnCifar().to('cuda')
+        classification_model = CnnCifar(args._num_class).to('cuda')
     elif args.classification_model == 'MNIST_1':
-        classification_model = MNIST_1(args._hidden_size_classification, 10).to('cuda')
+        classification_model = MNIST_1(args._hidden_size_classification, args._num_class).to('cuda')
     else:
         raise NotImplementedError()
 
+    is_influence_model_hashmap = False
     if args.influence_model == 'Net_IF':
-        influence_model = Net_IF(10).to('cuda')
+        influence_model = Net_IF(args._num_class).to('cuda')
     elif args.influence_model == 'MNIST_IF_1':
-        influence_model = MNIST_IF_1(args._hidden_size_influence, 10).to('cuda')
+        influence_model = MNIST_IF_1(args._hidden_size_influence, args._num_class).to('cuda')
+    elif args.influence_model == 'hashmap_IF':
+        influence_model = hashmap_IF(train_dataset_size).to('cuda')
+        is_influence_model_hashmap = True
     else:
         raise NotImplementedError()
 
@@ -87,6 +91,7 @@ def main(args):
         y_dev,
         classification_model=classification_model,
         influence_model=influence_model,
+        is_influence_model_hashmap=is_influence_model_hashmap,
         softmax_temp=args.softmax_temp,
         train_classification_till_converge=args.train_classification_till_converge)
 
@@ -124,9 +129,9 @@ def main(args):
     if not os.path.exists(args._ckpt_dir + args._pretrain_ckpt_name):
         for epoch in range(20):
             fenchel_classifier.pretrain_epoch()
-            test_acc = fenchel_classifier.evaluate('test')
-            print('Pre-train Epoch {}, Test Acc: {:.4f}'.format(
-                epoch, 100. * test_acc))
+            dev_acc = fenchel_classifier.evaluate('dev')
+            print('Pre-train Epoch {}, dev Acc: {:.4f}'.format(
+                epoch, 100. * dev_acc))
             fenchel_classifier.save_checkpoint_classification(args._ckpt_dir + args._pretrain_ckpt_name)
 
     if args.use_pretrain_classification:
@@ -138,12 +143,15 @@ def main(args):
         fenchel_classifier.train_epoch()
         result = {}
 
-        train_dataset_size = len(train_dataset)
         influences = [0.0 for _ in range(train_dataset_size)]
+        # return influence for all trainig point if using hashmap
+        if is_influence_model_hashmap:
+            influences = influence_model.get_all_influence().cpu().detach().numpy()
         # TODO compute by batch
-        for i in tqdm(range(train_dataset_size)):
-            x, y = train_dataset[i:i + 1][0], train_dataset[i:i + 1][1]
-            influences[i] = influence_model(x.cuda(), y.cuda()).cpu().item()
+        else:
+            for i in tqdm(range(train_dataset_size)):
+                x, y = train_dataset[i:i + 1][0], train_dataset[i:i + 1][1]
+                influences[i] = influence_model(x.cuda(), y.cuda()).cpu().item()
         influences = np.array(influences)
         helpful = np.argsort(influences)
         harmful = helpful[::-1]
@@ -175,6 +183,24 @@ def main(args):
             plt.title(f"{CLASS_MAP[y]}_{influences[harmful[i]]:.2f}")
             plt.imshow(x.permute(1, 2, 0))
         wandb.log({f"harmful_image_for_{CLASS_MAP[y_dev.item()]}": fig})
+        plt.clf()
+
+        """plot histogram"""
+        cmap = plt.cm.get_cmap('hsv', len(args.train_classes))
+        colors = [cmap(i) for i in range(len(args.train_classes))]
+        n_bins = 10
+        all_labels = train_dataset[:][1].numpy()
+        indset= sorted(list(set(all_labels)))
+        indmap = {indset[i]: i for i in range(len(indset))}
+        x = [[] for _ in  range(len(indset))]
+        for i in range(train_dataset_size):
+            x[indmap[all_labels[i]]].append(influences[i])
+        plt.hist(x, n_bins, density=True, histtype='bar', color=colors, label = args.train_classes, stacked = True)
+        plt.legend(prop={'size': 10})
+        try:
+            wandb.log({'histogram_influence': plt})
+        except:
+            pass
         plt.clf()
 
 

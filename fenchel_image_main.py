@@ -126,20 +126,21 @@ def main(args):
         args.influence_momentum,
         args.influence_weight_decay)
 
-    if not os.path.exists(args._ckpt_dir + args._pretrain_ckpt_name):
+    pretrain_ckpt_path = os.path.join(args._ckpt_dir, args._pretrain_ckpt_name)
+    if not os.path.exists(pretrain_ckpt_path):
         for epoch in range(20):
             fenchel_classifier.pretrain_epoch()
             dev_acc = fenchel_classifier.evaluate('dev')
             print('Pre-train Epoch {}, dev Acc: {:.4f}'.format(
                 epoch, 100. * dev_acc))
-            fenchel_classifier.save_checkpoint_classification(args._ckpt_dir + args._pretrain_ckpt_name)
+            fenchel_classifier.save_checkpoint_classification(pretrain_ckpt_path)
 
     if args.use_pretrain_classification:
-        fenchel_classifier.load_checkpoint_classification(args._ckpt_dir + args._pretrain_ckpt_name)
+        fenchel_classifier.load_checkpoint_classification(pretrain_ckpt_path)
 
     for epoch in range(args.max_epoch):
         if args.reset_pretrain_classification_every_epoch and epoch > 0:
-            fenchel_classifier.load_checkpoint_classification(args._ckpt_dir + args._pretrain_ckpt_name)
+            fenchel_classifier.load_checkpoint_classification(pretrain_ckpt_path)
         fenchel_classifier.train_epoch()
         result = {}
 

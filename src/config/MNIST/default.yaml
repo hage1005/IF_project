@@ -29,7 +29,7 @@ _gpu_id: 6
 _ckpt_dir: checkpoints/fenchel/mnist
 
 seed: 1
-_pretrain_ckpt_name: seed_1_first1000_shuffled.pt #modify together
+_pretrain_ckpt_name: first1000.pt #modify together
 
 _num_class: 10
 _ckpt_name: last

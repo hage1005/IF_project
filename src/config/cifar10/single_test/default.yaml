@@ -26,6 +26,6 @@ test_transformed_folder: ""
 seed: 1
 _gpu_id: 6
 _ckpt_dir: checkpoints/fenchel/
-_pretrain_ckpt_name: single_test_seed_1_first1000_shuffled.pt
+_pretrain_ckpt_name: first1000_shuffled.pt
 _num_class: 10
 _ckpt_name: last

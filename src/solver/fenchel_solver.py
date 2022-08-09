@@ -89,7 +89,7 @@ class FenchelSolver:
         pbar = tqdm(self._data_loader['train'], desc='Training Epoch')
 
         for batch_idx, batch in enumerate(pbar):
-            inputs, labels, ids = tuple(t.to('cuda') for t in batch)
+            inputs, labels, ids = tuple(t.to('cuda') for t in batch) # t[0] is input, t[1] is label, t[2] is id
             self.global_iter += 1
 
             weights = softmax_normalize(

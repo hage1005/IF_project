@@ -21,8 +21,6 @@ class ImageDataset:
 
         picked_examples = []
         for label in labels:
-            random.shuffle(examples[label])
-
             examples_with_label = examples[label][:num_per_class[label]]
             picked_examples.extend(examples_with_label)
 

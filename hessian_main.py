@@ -22,7 +22,8 @@ from torch.autograd.functional import hessian
 from torch.nn.utils import _stateless
 from torch.nn import CrossEntropyLoss 
 import yaml
-YAMLPath = 'src/config/MNIST/default.yaml'
+# YAMLPath = 'src/config/MNIST/default.yaml'
+YAMLPath = 'src/config/MNIST/single_test/exp/2.yaml'
 
 
 class Struct:
@@ -75,6 +76,7 @@ def main(args):
     hessian_solver.load_data('dev', dev_dataset, 32, shuffle= False)
 
     if not os.path.exists(pretrain_ckpt_path):
+        print("Pretrain ckpt not found, training from scratch")
         hessian_solver.get_optimizer_classification(
         args.classification_lr,
         args.classification_momentum,
@@ -89,6 +91,7 @@ def main(args):
     
     classification_model_pretrained = hessian_solver.load_checkpoint_classification(pretrain_ckpt_path)
     if not os.path.exists(inv_hessian_path + '.npy'):
+        print("Inv Hessian not found, calculating")
         inv_hessian = hessian_solver.calculate_inv_hessian()
         np.save(inv_hessian_path, inv_hessian)
     else:

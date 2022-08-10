@@ -141,7 +141,6 @@ class hessianSolver:
             checkpoint = torch.load(file_path, map_location='cuda')
             self.global_epoch = checkpoint['epoch']
             self._classification_model.load_state_dict(checkpoint['model_states']['classification'])
-            self._optimizer_classification.load_state_dict(checkpoint['optim_states']['classification'])
             print(
                 "=> loaded checkpoint '{} (epoch {})'".format(
                     file_path, self.global_epoch))

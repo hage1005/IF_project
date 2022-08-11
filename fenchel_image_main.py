@@ -10,7 +10,7 @@ import copy
 import numpy as np
 import torch
 
-from torchvision import models
+from torchvision import models, transforms
 from src.data_utils.MnistDataset import MnistDataset
 from src.utils.utils import save_json
 from src.data_utils.Cifar10Dataset import Cifar10Dataset
@@ -41,15 +41,25 @@ def main(args):
 
     if args.dataset_name == 'cifar10':
         Dataset = Cifar10Dataset
+        trans = transforms.Compose([ 
+            transforms.ToTensor(), 
+            transforms.Normalize(
+            (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+            ])
     elif args.dataset_name == 'mnist':
         Dataset = MnistDataset
+        trans = transforms.Compose([ 
+            transforms.ToTensor(), 
+            transforms.Normalize(
+            (0.1307,),(0.3081,))
+            ])
     else:
         raise NotImplementedError()
 
     class_label_dict = Dataset.get_class_label_dict()
     CLASS_MAP = Dataset.get_class_map()
     train_classes = [class_label_dict[c] for c in args.train_classes]
-    ImageDataset = Dataset(args.dev_original_folder, args.dev_transformed_folder, args.test_original_folder, args.test_transformed_folder, train_classes, args.num_per_class)
+    ImageDataset = Dataset(args.dev_original_folder, args.dev_transformed_folder, args.test_original_folder, args.test_transformed_folder, train_classes, trans, args.num_per_class)
 
 
     train_dataset, train_dataset_no_transform = ImageDataset.get_train()

@@ -2,7 +2,6 @@
 import argparse
 import os
 import random
-from tkinter import Image
 from matplotlib import pyplot as plt
 from sklearn.utils import shuffle
 from tqdm import tqdm
@@ -11,12 +10,12 @@ import copy
 import numpy as np
 import torch
 
-from torchvision import models
+from torchvision import models, transforms
 from src.data_utils.MnistDataset import MnistDataset
 from src.utils.utils import save_json
 from src.data_utils.Cifar10Dataset import Cifar10Dataset
 from src.solver.hessian_solver import hessianSolver
-from src.modeling.classification_models import CnnCifar, MNIST_1
+from src.modeling.classification_models import CnnCifar, MNIST_1, MNIST_LogisticRegression
 from src.modeling.influence_models import Net_IF, MNIST_IF_1
 from torch.autograd.functional import hessian
 from torch.nn.utils import _stateless
@@ -24,7 +23,7 @@ from torch.nn import CrossEntropyLoss
 import yaml
 # YAMLPath = 'src/config/MNIST/default.yaml'
 YAMLPath = 'src/config/MNIST/single_test/exp/2.yaml'
-method = "Percy"
+method = "Identity"
 
 class Struct:
     def __init__(self, **entries):
@@ -48,17 +47,29 @@ def main(args):
 
     if args.dataset_name == 'cifar10':
         Dataset = Cifar10Dataset
+        trans = transforms.Compose([ 
+            transforms.ToTensor(), 
+            transforms.Normalize(
+            (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+            ])
     elif args.dataset_name == 'mnist':
         Dataset = MnistDataset
+        trans = transforms.Compose([ 
+            transforms.ToTensor(), 
+            transforms.Normalize(
+            (0.1307,),(0.3081,))
+            ])
     else:
         raise NotImplementedError()
 
     class_label_dict = Dataset.get_class_label_dict()
     train_classes = [class_label_dict[c] for c in args.train_classes]
-    ImageDataset = Dataset(args.dev_original_folder, args.dev_transformed_folder, args.test_original_folder, args.test_transformed_folder, train_classes, args.num_per_class)
+    ImageDataset = Dataset(args.dev_original_folder, args.dev_transformed_folder, args.test_original_folder, args.test_transformed_folder, train_classes, trans, args.num_per_class)
 
     if args.classification_model == 'MNIST_1':
         classification_model = MNIST_1(args._hidden_size_classification, args._num_class).to('cuda')
+    elif args.classification_model == 'MNIST_LogisticRegression':
+        classification_model = MNIST_LogisticRegression(args._num_class).to('cuda')
     else:
         raise NotImplementedError()
     
@@ -69,8 +80,8 @@ def main(args):
         dev_dataset, args.dev_id_num)
     train_dataset_size = len(train_dataset)
 
-    pretrain_ckpt_path = os.path.join(args._ckpt_dir, args._pretrain_ckpt_name)
-    inv_hessian_path = os.path.join(args._ckpt_dir, "numpy_inv_hessian_" + args._pretrain_ckpt_name)
+    pretrain_ckpt_path = os.path.join(args._ckpt_dir, args.classification_model, args._pretrain_ckpt_name)
+    inv_hessian_path = os.path.join(args._ckpt_dir, args.classification_model, "numpy_inv_hessian_" + args._pretrain_ckpt_name)
     hessian_solver = hessianSolver(classification_model, pretrain_ckpt_path, inv_hessian_path)
     hessian_solver.load_data('train', train_dataset, 32, shuffle= True)
     hessian_solver.load_data('dev', dev_dataset, 32, shuffle= False)

@@ -2,7 +2,7 @@ exp_title: original_config
 dataset_name: mnist
 train_classes: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 num_per_class: [100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
-classification_model: MNIST_1
+classification_model: MNIST_LogisticRegression
 influence_model: hashmap_IF
 max_epoch: 300
 influence_lr: 0.3

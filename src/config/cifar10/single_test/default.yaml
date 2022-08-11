@@ -4,8 +4,8 @@ train_classes: ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", 
 num_per_class: [100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
 classification_model: Resnet34
 influence_model: Net_IF
-max_epoch: 30
-influence_lr: 0.1
+max_epoch: 100
+influence_lr: 0.001
 influence_momentum: 0.9
 influence_weight_decay: 0.01
 classification_lr: 0.001
@@ -25,7 +25,7 @@ test_original_folder: ""
 test_transformed_folder: ""
 seed: 1
 _gpu_id: 6
-_ckpt_dir: checkpoints/fenchel/
-_pretrain_ckpt_name: first1000_shuffled.pt
+_ckpt_dir: checkpoints/fenchel/cifar10
+_pretrain_ckpt_name: first1000.pt
 _num_class: 10
 _ckpt_name: last

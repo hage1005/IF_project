@@ -1,7 +1,8 @@
 import torch.nn as nn
 from torch.nn import functional as F
 from torch.nn.modules.utils import _pair
-
+from torch import Tensor
+import torch
 # from transformers.modeling_utils import BertSelfAttention
 
 import operator
@@ -91,7 +92,7 @@ class MagicModule(nn.Module):
         x = x.view(*new_x_shape)
         return x.permute(0, 2, 1, 3)
 
-    def _conv_forward(self, input, weight, bias):
+    def _conv_forward(self, input, weight, bias): #for resnet
         assert issubclass(self._type, nn.Conv2d)
 
         if self.padding_mode != 'zeros':
@@ -108,6 +109,24 @@ class MagicModule(nn.Module):
                 self.groups)
         return F.conv2d(input, weight, bias, self.stride,
                         self.padding, self.dilation, self.groups)
+    
+    def _forward_impl(self, x: Tensor) -> Tensor:
+        # See note [TorchScript super()]
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.fc(x)
+
+        return x
 
     def _check_input_dim(self, input):
         assert issubclass(self._type, nn.BatchNorm2d)

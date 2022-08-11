@@ -24,7 +24,7 @@ from torch.nn import CrossEntropyLoss
 import yaml
 # YAMLPath = 'src/config/MNIST/default.yaml'
 YAMLPath = 'src/config/MNIST/single_test/exp/2.yaml'
-
+method = "Percy"
 
 class Struct:
     def __init__(self, **entries):
@@ -117,7 +117,10 @@ def main(args):
 
         train_loss = loss_grad_at_point(classification_model_pretrained, x_train, y_train).to("cpu").numpy()
 
-        if_score = -np.matmul(np.matmul(test_loss.T, inv_Hessian), train_loss)
+        if method == "Identity":
+            if_score = -np.matmul(test_loss.T, train_loss)
+        elif method == "Percy":
+            if_score = -np.matmul(np.matmul(test_loss.T, inv_Hessian), train_loss)
 
         return if_score
     influences = []
@@ -137,7 +140,7 @@ def main(args):
     json_path = os.path.join(
         "outputs",
         args.dataset_name,
-        f"Percy_{args.dataset_name}_devId_{args.dev_id_num}.json")
+        f"{method}_{args.dataset_name}_devId_{args.dev_id_num}.json")
     save_json(result, json_path)
 
 

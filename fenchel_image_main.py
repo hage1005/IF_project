@@ -23,7 +23,7 @@ import yaml
 
 os.chdir('/home/xiaochen/kewen/IF_project')
 YAMLPath = 'src/config/MNIST/single_test/exp/2.yaml'
-# YAMLPath = 'src/config/cifar10/good_config/8.yaml'
+# YAMLPath = 'src/config/cifar10/single_test/default.yaml'
 
 def main(args):
     # set seed for reproducibility
@@ -126,7 +126,7 @@ def main(args):
         args.influence_momentum,
         args.influence_weight_decay)
 
-    pretrain_ckpt_path = os.path.join(args._ckpt_dir, args._pretrain_ckpt_name)
+    pretrain_ckpt_path = os.path.join(args._ckpt_dir, args.classification_model, args._pretrain_ckpt_name)
     if not os.path.exists(pretrain_ckpt_path):
         for epoch in range(20):
             fenchel_classifier.pretrain_epoch()
@@ -165,8 +165,10 @@ def main(args):
             f"IF_{args.dataset_name}_devId_{args.dev_id_num}_epoch_{epoch}.json")
         save_json(result, json_path)
 
-        wandb.log({'total_weight_std': torch.std(
-            fenchel_classifier._weights).item()})
+        wandb.log({
+                f'all_{train_dataset_size}_weight_std': torch.std(fenchel_classifier._weights).item(),
+                f'all_{train_dataset_size}_weight_mean': torch.mean(fenchel_classifier._weights).item()
+            })
 
         fig = plt.figure(figsize=(6, 7))
         for i in range(1, 10):

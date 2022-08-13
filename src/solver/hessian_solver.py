@@ -68,9 +68,9 @@ class hessianSolver:
             loss_classification = self.criterion(logits, labels)
             loss_classification.backward()
             self._optimizer_classification.step()
-        if self.global_iter % 20 == 0:
-            pbar.write('[{}] loss: {:.3F} '.format(
-                self.global_iter, loss_classification))
+            if self.global_iter % 20 == 0:
+                pbar.write('[{}] loss: {:.3F} '.format(
+                    self.global_iter, loss_classification))
     
     def loss(self, params):
         print(params.shape)
@@ -86,7 +86,7 @@ class hessianSolver:
         labels = self._dataset['train'][:][1].to('cuda')
         out: torch.Tensor = _stateless.functional_call(self._classification_model, \
             {n: p for n, p in zip(self.names, params_splitted_reshaped)}, inputs)
-        loss = self.criterion(out, labels)
+        loss = self.criterion(out, labels) * len(self._dataset['train'])
         return loss
 
 

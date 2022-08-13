@@ -22,9 +22,9 @@ from torch.nn.utils import _stateless
 from torch.nn import CrossEntropyLoss 
 import yaml
 # YAMLPath = 'src/config/MNIST/default.yaml'
-YAMLPath = 'src/config/MNIST/single_test/exp/2.yaml'
-method = "Identity"
-
+YAMLPath = 'src/config/MNIST/single_test/exp/MNIST_1_100each.yaml'
+# method = "Identity"
+method = "Percy"
 class Struct:
     def __init__(self, **entries):
         self.__dict__.update(entries)

@@ -39,12 +39,14 @@ class ImageDataset:
     def get_train_data_no_transform_raw(self):
         pass
 
-    def get_train(self):
+    def get_train(self, label_map=None, label_tensor_type = torch.LongTensor):
 
         train_data_no_transform_raw = self.get_train_data_no_transform_raw()
         train_data_no_transform_sampled = self._subsample_by_classes(
             train_data_no_transform_raw, self.classes, self.num_per_class)
-
+        if label_map is None:
+            label_map = {label: label for label in self.classes}   
+                     
         ToTensor = transforms.ToTensor()
         train_data_x_no_transform = torch.stack(
             [ToTensor(example[0]) for example in train_data_no_transform_sampled])
@@ -52,8 +54,8 @@ class ImageDataset:
         train_data_x_transformed = torch.stack(
             [self.trans(x[0]) for x in train_data_no_transform_sampled])
 
-        train_data_y = torch.LongTensor(
-            [example[1] for example in train_data_no_transform_sampled])
+        train_data_y = label_tensor_type(
+            [label_map[example[1]] for example in train_data_no_transform_sampled])
 
         assert(len(train_data_x_transformed) == len(train_data_x_no_transform))
 
@@ -66,14 +68,27 @@ class ImageDataset:
 
         return train_data_tensor, train_data_no_transform_tensor
         
-    def get_dev(self):
-        dev_data = FolderDataset(self.dev_original_dir, self.trans)
+    def get_dev(self, label_map=None, label_tensor_type = torch.LongTensor):
+        dev_data_transformed = FolderDataset(self.dev_original_dir, self.trans)
         dev_data_no_transform = FolderDataset(self.dev_original_dir)
-        print('loaded dev FolderDataset with {} files in folder, '.format(len(dev_data)))
+        # trans = transforms.Compose([x for x in self.trans.transforms if not issubclass(type(x), torchvision.transforms.transforms.ToTensor) ])
 
-        return dev_data, dev_data_no_transform
+        train_data_x_transformed = torch.stack([x[0] for x in dev_data_transformed])
+
+        if label_map is None:
+            label_map = {label: label for label in self.classes}
+
+        train_data_y = label_tensor_type(
+            [label_map[x[1]] for x in dev_data_transformed])
+        dev_data_transformed_mapped = TensorDataset(train_data_x_transformed, train_data_y)
+        dev_data_no_transform_mapped = [ (x[0], label_map[x[1]] ) for x in dev_data_no_transform ] 
+        assert(len(dev_data_transformed_mapped) == len(dev_data_no_transform_mapped))
+
+        print('loaded dev FolderDataset with {} files in folder, '.format(len(dev_data_transformed_mapped)))
+
+        return dev_data_transformed_mapped, dev_data_no_transform_mapped
     
-    def get_test(self):
+    def get_test(self, label_map=None, label_tensor_type = torch.LongTensor):
         test_data = FolderDataset(self.test_original_dir, self.trans)
         test_data_no_transform = FolderDataset(self.test_original_dir)
         print('loaded test FolderDataset with {} files in folder, '.format(len(test_data)))

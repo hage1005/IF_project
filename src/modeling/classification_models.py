@@ -52,9 +52,10 @@ class MNIST_1(nn.Module):
 class MNIST_LogisticRegression(nn.Module):
     def __init__(self, num_classes):
         super(MNIST_LogisticRegression, self).__init__()
-        self.linear = torch.nn.Linear(28*28, num_classes)
+        self.linear = torch.nn.Linear(28*28, num_classes, bias=False)
 
     def forward(self, x):
         x = x.reshape(x.shape[0], 28*28)
-        outputs = torch.sigmoid(self.linear(x))
+        # outputs = torch.sigmoid(self.linear(x))
+        outputs = self.linear(x)
         return outputs

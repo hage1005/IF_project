@@ -15,14 +15,16 @@ from src.data_utils.MnistDataset import MnistDataset
 from src.utils.utils import save_json
 from src.data_utils.Cifar10Dataset import Cifar10Dataset
 from src.solver.fenchel_solver import FenchelSolver
-from src.modeling.classification_models import CnnCifar, MNIST_1
+from src.modeling.classification_models import CnnCifar, MNIST_1, MNIST_2, CnnMinst
 from src.modeling.influence_models import Net_IF, MNIST_IF_1, hashmap_IF
 
 import wandb
 import yaml
 
 os.chdir('/home/xiaochen/kewen/IF_project')
-YAMLPath = 'src/config/MNIST/single_test/exp/2.yaml'
+YAMLPath = 'src/config/MNIST/single_test/exp/MNIST_1_100each.yaml'
+# YAMLPath = 'src/config/MNIST/single_test/exp/Cnn.yaml'
+
 # YAMLPath = 'src/config/cifar10/single_test/default.yaml'
 
 def main(args):
@@ -82,6 +84,10 @@ def main(args):
         classification_model = CnnCifar(args._num_class).to('cuda')
     elif args.classification_model == 'MNIST_1':
         classification_model = MNIST_1(args._hidden_size_classification, args._num_class).to('cuda')
+    elif args.classification_model == 'MNIST_2':
+        classification_model = MNIST_2(args._num_class).to('cuda')
+    elif args.classification_model == 'CnnMinst':
+        classification_model = CnnMinst(args._num_class).to('cuda')
     else:
         raise NotImplementedError()
 
@@ -103,7 +109,8 @@ def main(args):
         influence_model=influence_model,
         is_influence_model_hashmap=is_influence_model_hashmap,
         softmax_temp=args.softmax_temp,
-        train_classification_till_converge=args.train_classification_till_converge)
+        train_classification_till_converge=args.train_classification_till_converge,
+        clip_min_weight=args.clip_min_weight)
 
     fenchel_classifier.load_data(
         "train",
@@ -172,7 +179,7 @@ def main(args):
         json_path = os.path.join(
             "outputs",
             args.dataset_name,
-            f"IF_{args.dataset_name}_devId_{args.dev_id_num}_epoch_{epoch}.json")
+            f"IF_{args.dataset_name}_devId_{args.dev_id_num}_{args.classification_model}_epoch_{epoch}.json")
         save_json(result, json_path)
 
         wandb.log({

@@ -11,6 +11,7 @@ class FolderDataset(Dataset):
         return len(os.listdir(self.folder))
 
     def __getitem__(self, idx):
+        assert(os.path.exists(self.folder))
         try:
             res = torch.load(f"{self.folder}/tensor{idx}.pt")
             if self.trans:

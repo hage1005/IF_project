@@ -15,14 +15,14 @@ from src.data_utils.MnistDataset import MnistDataset
 from src.utils.utils import save_json
 from src.data_utils.Cifar10Dataset import Cifar10Dataset
 from src.solver.hessian_solver_BCE import hessianSolver
-from src.modeling.classification_models import CnnCifar, MNIST_1, MNIST_LogisticRegression
+from src.modeling.classification_models import CnnCifar, MNIST_1, MNIST_LogisticRegression, MNIST_Regression_2Layer, CnnMinst
 from src.modeling.influence_models import Net_IF, MNIST_IF_1
 from torch.autograd.functional import hessian
 from torch.nn.utils import _stateless
 from torch.nn import CrossEntropyLoss, NLLLoss, BCELoss
 import yaml
 # YAMLPath = 'src/config/MNIST/default.yaml'
-YAMLPath = 'src/config/MNIST/single_test/exp/Percy_figure_2.yaml'
+YAMLPath = 'src/config/MNIST/single_test/exp/Cnn.yaml'
 method = "Percy"
 # method = "Identity"
 criterion = BCELoss()
@@ -76,6 +76,10 @@ def main(args):
         classification_model = MNIST_1(args._hidden_size_classification, args._num_class).to('cuda')
     elif args.classification_model == 'MNIST_LogisticRegression':
         classification_model = MNIST_LogisticRegression(1).to('cuda')
+    elif args.classification_model == 'MNIST_Regression_2Layer':
+        classification_model = MNIST_Regression_2Layer(args._hidden_size_classification, 1).to('cuda')
+    elif args.classification_model == 'CnnMnist':
+        classification_model = CnnMinst().to('cuda')
     else:
         raise NotImplementedError()
     

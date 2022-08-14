@@ -1,14 +1,14 @@
 exp_title: original_config
 dataset_name: mnist
-train_classes: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-num_per_class: [100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
-classification_model: MNIST_1
+train_classes: ["1", "7"]
+num_per_class: [10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000]
+classification_model: MNIST_Regression_2Layer
 influence_model: hashmap_IF
 max_epoch: 300
-influence_lr: 0.3
+influence_lr: 0.01
 influence_momentum: 0.9
 influence_weight_decay: 0.01
-classification_lr: 0.3
+classification_lr: 0.001
 classification_momentum: 0.9
 classification_weight_decay: 0.01
 batch_size: 32
@@ -20,16 +20,16 @@ softmax_temp: 10
 train_classification_till_converge: False
 use_pretrain_classification: True
 reset_pretrain_classification_every_epoch: False
-dev_id_num: 9
-dev_original_folder: data/MNIST/dev/oneClassEach/original_sampled
-dev_transformed_folder: data/MNIST/dev/oneClassEach/transformed_sampled
+dev_id_num: 0
+dev_original_folder: data/MNIST/dev/classOneSingle
+dev_transformed_folder: ""
 test_original_folder: ""
 test_transformed_folder: ""
-_gpu_id: 0
+_gpu_id: 1
 _ckpt_dir: checkpoints/fenchel/mnist
 
 seed: 1
-_pretrain_ckpt_name: classAll100Each.pt #modify together
+_pretrain_ckpt_name: classOneAndSevenAll.pt #modify together
 
 _num_class: 10 # the maximum number of class
 _ckpt_name: last

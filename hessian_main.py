@@ -15,13 +15,14 @@ from src.data_utils.MnistDataset import MnistDataset
 from src.utils.utils import save_json
 from src.data_utils.Cifar10Dataset import Cifar10Dataset
 from src.solver.hessian_solver import hessianSolver
-from src.modeling.classification_models import CnnCifar, MNIST_1, MNIST_LogisticRegression
+from src.modeling.classification_models import CnnCifar, MNIST_1, MNIST_LogisticRegression, MNIST_2
 from src.modeling.influence_models import Net_IF, MNIST_IF_1
 from torch.autograd.functional import hessian
 from torch.nn.utils import _stateless
 from torch.nn import CrossEntropyLoss 
 import yaml
 # YAMLPath = 'src/config/MNIST/default.yaml'
+# YAMLPath = 'src/config/MNIST/single_test/exp/MNIST_2_oneAndSevenAll.yaml'
 YAMLPath = 'src/config/MNIST/single_test/exp/MNIST_1_100each.yaml'
 # method = "Identity"
 method = "Percy"
@@ -68,6 +69,8 @@ def main(args):
 
     if args.classification_model == 'MNIST_1':
         classification_model = MNIST_1(args._hidden_size_classification, args._num_class).to('cuda')
+    elif args.classification_model == 'MNIST_2':
+        classification_model = MNIST_2(args._num_class).to('cuda')
     elif args.classification_model == 'MNIST_LogisticRegression':
         classification_model = MNIST_LogisticRegression(args._num_class).to('cuda')
     else:

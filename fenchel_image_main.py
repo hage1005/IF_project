@@ -22,7 +22,8 @@ import wandb
 import yaml
 
 os.chdir('/home/xiaochen/kewen/IF_project')
-YAMLPath = 'src/config/MNIST/single_test/exp/MNIST_1_100each.yaml'
+# YAMLPath = 'src/config/MNIST/single_test/exp/MNIST_1_100each.yaml'
+YAMLPath = 'src/config/MNIST/single_test/exp/MNIST_1_100each/test_id_1/fenchel.yaml'
 # YAMLPath = 'src/config/MNIST/single_test/exp/Cnn.yaml'
 
 # YAMLPath = 'src/config/cifar10/single_test/default.yaml'
@@ -143,9 +144,10 @@ def main(args):
         args.influence_momentum,
         args.influence_weight_decay)
 
-    pretrain_ckpt_path = os.path.join(args._ckpt_dir, args.classification_model, args._pretrain_ckpt_name)
+    os.makedirs(args._ckpt_dir, exist_ok=True)
+    pretrain_ckpt_path = os.path.join(args._ckpt_dir, args._pretrain_ckpt_name)
     if not os.path.exists(pretrain_ckpt_path):
-        for epoch in range(20):
+        for epoch in range(40):
             fenchel_classifier.pretrain_epoch()
             dev_acc = fenchel_classifier.evaluate('dev')
             print('Pre-train Epoch {}, dev Acc: {:.4f}'.format(
@@ -170,23 +172,36 @@ def main(args):
             for i in tqdm(range(train_dataset_size)):
                 x, y = train_dataset[i:i + 1][0], train_dataset[i:i + 1][1]
                 influences[i] = influence_model(x.cuda(), y.cuda()).cpu().item()
-        influences = np.array(influences)
-        helpful = np.argsort(influences)
-        harmful = helpful[::-1]
-        result["helpful"] = helpful[:500].tolist()
-        result["harmful"] = harmful[:500].tolist()
-        result["influence"] = influences.tolist()
-        json_path = os.path.join(
+        
+        def save_result(influences, path):
+            influences = np.array(influences)
+            helpful = np.argsort(influences)
+            harmful = helpful[::-1]
+            result["helpful"] = helpful[:500].tolist()
+            result["harmful"] = harmful[:500].tolist()
+            result["influence"] = influences.tolist()
+
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            save_json(result, path)
+
+        base_path = os.path.join(
             "outputs",
             args.dataset_name,
-            f"IF_{args.dataset_name}_devId_{args.dev_id_num}_{args.classification_model}_epoch_{epoch}.json")
-        save_json(result, json_path)
+            args.classification_model,
+            "dev_id_" + str(args.dev_id_num),
+            
+        )
+        save_result(influences, os.path.join(base_path, "IF_" + args.influence_model, f"epoch{epoch}.json"))
+        if epoch == 0:
+            save_result(fenchel_classifier.first_iteration_grad.cpu().detach(), os.path.join(base_path, "first_iteration_grad.json"))
 
         wandb.log({
                 f'all_{train_dataset_size}_weight_std': torch.std(fenchel_classifier._weights).item(),
                 f'all_{train_dataset_size}_weight_mean': torch.mean(fenchel_classifier._weights).item()
             })
 
+        helpful = np.argsort(influences)
+        harmful = helpful[::-1]
         fig = plt.figure(figsize=(6, 7))
         for i in range(1, 10):
             x, y = train_dataset_no_transform[helpful[i]]

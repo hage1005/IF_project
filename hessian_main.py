@@ -23,9 +23,9 @@ from torch.nn import CrossEntropyLoss
 import yaml
 # YAMLPath = 'src/config/MNIST/default.yaml'
 # YAMLPath = 'src/config/MNIST/single_test/exp/MNIST_2_oneAndSevenAll.yaml'
-YAMLPath = 'src/config/MNIST/single_test/exp/MNIST_1_100each.yaml'
-# method = "Identity"
-method = "Percy"
+YAMLPath = 'src/config/MNIST/single_test/exp/MNIST_1_100each/test_id_4/hessian.yaml'
+method = "Identity"
+# method = "Percy"
 class Struct:
     def __init__(self, **entries):
         self.__dict__.update(entries)
@@ -83,12 +83,13 @@ def main(args):
         dev_dataset, args.dev_id_num)
     train_dataset_size = len(train_dataset)
 
-    pretrain_ckpt_path = os.path.join(args._ckpt_dir, args.classification_model, args._pretrain_ckpt_name)
-    inv_hessian_path = os.path.join(args._ckpt_dir, args.classification_model, "numpy_inv_hessian_" + args._pretrain_ckpt_name)
+    pretrain_ckpt_path = os.path.join(args._ckpt_dir, args._pretrain_ckpt_name)
+    inv_hessian_path = os.path.join(args._ckpt_dir, "numpy_inv_hessian_" + args._pretrain_ckpt_name)
     hessian_solver = hessianSolver(classification_model, pretrain_ckpt_path, inv_hessian_path)
     hessian_solver.load_data('train', train_dataset, 32, shuffle= True)
     hessian_solver.load_data('dev', dev_dataset, 32, shuffle= False)
 
+    os.makedirs(args._ckpt_dir, exist_ok=True)
     if not os.path.exists(pretrain_ckpt_path):
         print("Pretrain ckpt not found, training from scratch")
         hessian_solver.get_optimizer_classification(
@@ -131,32 +132,37 @@ def main(args):
 
         train_loss = loss_grad_at_point(classification_model_pretrained, x_train, y_train).to("cpu").numpy()
 
-        if method == "Identity":
-            if_score = -np.matmul(test_loss.T, train_loss)
-        elif method == "Percy":
-            if_score = -np.matmul(np.matmul(test_loss.T, inv_Hessian), train_loss)
+        if_score_identity = -np.matmul(test_loss.T, train_loss)
+        if_score_percy = -np.matmul(np.matmul(test_loss.T, inv_Hessian), train_loss)
 
-        return if_score
-    influences = []
-
+        return if_score_identity, if_score_percy
+    influences_identity = []
+    influences_percy = []
     classification_model_pretrained.to('cpu')
     for i in tqdm(range(train_dataset_size)):
-        if_score = calculate_if(train_dataset[i][0], train_dataset[i][1], x_dev, y_dev, inv_hessian)
-        influences.append(if_score)
+        if_score_identity, if_score_percy = calculate_if(train_dataset[i][0], train_dataset[i][1], x_dev, y_dev, inv_hessian)
+        influences_identity.append(if_score_identity)
+        influences_percy.append(if_score_percy)
 
-    result = {}
-    influences = np.array(influences)
-    helpful = np.argsort(influences)
-    harmful = helpful[::-1]
-    result["helpful"] = helpful[:500].tolist()
-    result["harmful"] = harmful[:500].tolist()
-    result["influence"] = influences.tolist()
-    json_path = os.path.join(
-        "outputs",
-        args.dataset_name,
-        f"{method}_{args.dataset_name}_devId_{args.dev_id_num}.json")
-    save_json(result, json_path)
+    def save_result(method, influences):
+        result = {}
+        influences = np.array(influences)
+        helpful = np.argsort(influences)
+        harmful = helpful[::-1]
+        result["helpful"] = helpful[:500].tolist()
+        result["harmful"] = harmful[:500].tolist()
+        result["influence"] = influences.tolist()
+        json_path = os.path.join(
+            "outputs",
+            args.dataset_name,
+            args.classification_model,
+            "dev_id_" + str(args.dev_id_num),
+            f"{method}.json")
+        os.makedirs(os.path.dirname(json_path), exist_ok=True)
+        save_json(result, json_path)
 
+    save_result("Identity", influences_identity)
+    save_result("Percy", influences_percy)
 
 
 

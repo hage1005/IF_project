@@ -20,17 +20,17 @@ softmax_temp: 10
 train_classification_till_converge: False
 use_pretrain_classification: True
 reset_pretrain_classification_every_epoch: False
-clip_min_weight: False
-dev_id_num: 9
+clip_min_weight: True
+dev_id_num: 1
 dev_original_folder: data/MNIST/dev/oneClassEach/original_sampled
 dev_transformed_folder: data/MNIST/dev/oneClassEach/transformed_sampled
 test_original_folder: ""
 test_transformed_folder: ""
 _gpu_id: 1
-_ckpt_dir: checkpoints/fenchel/mnist
+_ckpt_dir: checkpoints/fenchel/mnist/MNIST_1
 
 seed: 1
-_pretrain_ckpt_name: classAll100Each.pt #modify together
+_pretrain_ckpt_name: classAll100Each_epoch40_lr0.01.pt #modify together
 
 _num_class: 10 # the maximum number of class
 _ckpt_name: last

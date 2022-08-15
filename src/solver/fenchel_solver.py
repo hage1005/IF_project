@@ -54,9 +54,12 @@ class FenchelSolver:
         self.clip_min_weight = clip_min_weight
         self.is_influence_model_hashmap = is_influence_model_hashmap
 
+        self.first_iteration_grad = None
+
     def init_weights(self, n_examples, w_init, w_decay):
         self._weights = torch.tensor(
             [w_init] * n_examples, requires_grad=True).to('cuda')
+        self.first_iteration_grad = torch.zeros(n_examples)
         self._w_decay = w_decay
 
     def load_data(self, set_type, examples, batch_size, shuffle):
@@ -217,6 +220,9 @@ class FenchelSolver:
         if self.clip_min_weight:
             self._weights[ids] = torch.max(self._weights[ids], torch.ones_like(
                 self._weights[ids]).fill_(EPSILON))
+
+        if self.global_epoch == 1:
+            self.first_iteration_grad[ids.cpu()] = weights_grad.cpu()
 
         if self._weights[ids].data[0] == torch.inf or self._weights[ids].data[0].isnan(
         ):

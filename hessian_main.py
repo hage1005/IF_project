@@ -15,7 +15,7 @@ from src.data_utils.MnistDataset import MnistDataset
 from src.utils.utils import save_json
 from src.data_utils.Cifar10Dataset import Cifar10Dataset
 from src.solver.hessian_solver import hessianSolver
-from src.modeling.classification_models import CnnCifar, MNIST_1, MNIST_LogisticRegression, MNIST_2
+from src.modeling.classification_models import CnnCifar, MNIST_1, CnnMnist, MNIST_LogisticRegression, MNIST_2
 from src.modeling.influence_models import Net_IF, MNIST_IF_1
 from torch.autograd.functional import hessian
 from torch.nn.utils import _stateless
@@ -23,9 +23,8 @@ from torch.nn import CrossEntropyLoss
 import yaml
 # YAMLPath = 'src/config/MNIST/default.yaml'
 # YAMLPath = 'src/config/MNIST/single_test/exp/MNIST_2_oneAndSevenAll.yaml'
-YAMLPath = 'src/config/MNIST/single_test/exp/MNIST_1_100each/test_id_4/hessian.yaml'
-method = "Identity"
-# method = "Percy"
+YAMLPath = 'src/config/MNIST/single_test/exp/MNIST_1_100each/test_id_1/fenchel.yaml'
+
 class Struct:
     def __init__(self, **entries):
         self.__dict__.update(entries)
@@ -73,6 +72,8 @@ def main(args):
         classification_model = MNIST_2(args._num_class).to('cuda')
     elif args.classification_model == 'MNIST_LogisticRegression':
         classification_model = MNIST_LogisticRegression(args._num_class).to('cuda')
+    elif args.classification_model == 'CnnMnist':
+        classification_model = CnnMnist(args._num_class).to('cuda')
     else:
         raise NotImplementedError()
     
@@ -83,26 +84,29 @@ def main(args):
         dev_dataset, args.dev_id_num)
     train_dataset_size = len(train_dataset)
 
-    pretrain_ckpt_path = os.path.join(args._ckpt_dir, args._pretrain_ckpt_name)
-    inv_hessian_path = os.path.join(args._ckpt_dir, "numpy_inv_hessian_" + args._pretrain_ckpt_name)
+    ckpt_dir = os.path.join("checkpoints/fenchel", args.dataset_name, args.classification_model)
+    os.makedirs(ckpt_dir, exist_ok=True)
+    pretrain_ckpt_path = os.path.join(ckpt_dir,
+    f"epoch{args.max_pretrain_epoch}_lr{args.pretrain_classification_lr}_" + args._pretrain_ckpt_name )
+    inv_hessian_path = os.path.join(ckpt_dir, "numpy_inv_hessian_" + os.path.basename(pretrain_ckpt_path))
     hessian_solver = hessianSolver(classification_model, pretrain_ckpt_path, inv_hessian_path)
     hessian_solver.load_data('train', train_dataset, 32, shuffle= True)
     hessian_solver.load_data('dev', dev_dataset, 32, shuffle= False)
 
-    os.makedirs(args._ckpt_dir, exist_ok=True)
     if not os.path.exists(pretrain_ckpt_path):
         print("Pretrain ckpt not found, training from scratch")
         hessian_solver.get_optimizer_classification(
         args.classification_lr,
         args.classification_momentum,
-        args.classification_weight_decay)
+        args.classification_weight_decay,
+        args.optimizer_classification)
 
-        for epoch in range(20):
+        for epoch in range(args.max_pretrain_epoch):
             hessian_solver.pretrain_epoch()
             dev_acc = hessian_solver.evaluate('dev')
             print('Pre-train Epoch {}, dev Acc: {:.4f}'.format(
                 epoch, 100. * dev_acc))
-            hessian_solver.save_checkpoint_classification(pretrain_ckpt_path)
+        hessian_solver.save_checkpoint_classification(pretrain_ckpt_path)
     
     classification_model_pretrained = hessian_solver.load_checkpoint_classification(pretrain_ckpt_path)
     if not os.path.exists(inv_hessian_path + '.npy'):
@@ -157,11 +161,17 @@ def main(args):
             args.dataset_name,
             args.classification_model,
             "dev_id_" + str(args.dev_id_num),
+            f"pretrain{args.max_pretrain_epoch}epoch",
             f"{method}.json")
         os.makedirs(os.path.dirname(json_path), exist_ok=True)
         save_json(result, json_path)
 
-    save_result("Identity", influences_identity)
+    x = np.array(influences_identity)
+    y = np.array(influences_percy)
+    corr = round(np.corrcoef(x,y)[0,1],3)
+
+    save_result(f"Identity", influences_identity)
+    save_json({}, f"Percy_corr{corr}")
     save_result("Percy", influences_percy)
 
 

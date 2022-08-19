@@ -4,17 +4,19 @@ train_classes: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 num_per_class: [100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
 classification_model: MNIST_1
 influence_model: hashmap_IF
-max_epoch: 100
+max_epoch: 200
 influence_lr: 0.3
 influence_momentum: 0.9
 influence_weight_decay: 0.01
-classification_lr: 0.3
+optimizer_influence: SGD
+classification_lr: 0.001
 classification_momentum: 0.9
 classification_weight_decay: 0.01
+optimizer_classification: Adam
 batch_size: 32
 _hidden_size_classification: 32
 _hidden_size_influence: 32
-dataWeight_weight_decay: 1
+dataWeight_weight_decay: 1 # 1 means no weight decay equation: w / decay
 dataWeight_weight_init: 0.
 softmax_temp: 10
 train_classification_till_converge: False
@@ -23,14 +25,16 @@ reset_pretrain_classification_every_epoch: False
 clip_min_weight: True
 dev_id_num: 3
 dev_original_folder: data/MNIST/dev/oneClassEach/original_sampled
-dev_transformed_folder: data/MNIST/dev/oneClassEach/transformed_sampled
-test_original_folder: ""
-test_transformed_folder: ""
+dev_transformed_folder: data/MNIST/dev/oneClassEach/transformed_sampled #useless now
+test_original_folder: "" #useless now
+test_transformed_folder: "" #useless now
 _gpu_id: 1
-_ckpt_dir: checkpoints/fenchel/mnist/MNIST_1
+_ckpt_dir: checkpoints/fenchel/mnist/MNIST_1 #useless
 
 seed: 1
-_pretrain_ckpt_name: classAll100Each.pt #modify together
+max_pretrain_epoch: 100
+pretrain_classification_lr: 0.001 #use 0.001 lr and 100epoch for pretrain default
+_pretrain_ckpt_name: classAll100Each.pt #specify the dataset used for training
 
 _num_class: 10 # the maximum number of class
 _ckpt_name: last

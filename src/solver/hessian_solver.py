@@ -42,10 +42,23 @@ class hessianSolver:
         self._optimizer_classification = None
 
 
-    def get_optimizer_classification(self, lr, momentum, weight_decay):
-        self._optimizer_classification = optim.SGD(
-            self._classification_model.parameters(),
-            lr=lr, momentum=momentum, weight_decay=weight_decay)
+    def get_optimizer_influence(self, lr, momentum, weight_decay, optimizer_influence):
+        if optimizer_influence == "SGD":
+            self._optimizer_influence = optim.SGD(
+                self._influence_model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
+        elif optimizer_influence == "Adam":
+            self._optimizer_influence = optim.Adam(
+                self._influence_model.parameters(), lr=lr, weight_decay=weight_decay)
+
+    def get_optimizer_classification(self, lr, momentum, weight_decay, optimizer_classification):
+        if optimizer_classification == "SGD":
+            self._optimizer_classification = optim.SGD(
+                self._classification_model.parameters(),
+                lr=lr, momentum=momentum, weight_decay=weight_decay)
+        elif optimizer_classification == "Adam":
+            self._optimizer_classification = optim.Adam(
+                self._classification_model.parameters(),
+                lr=lr, weight_decay=weight_decay)
 
     def load_data(self, set_type, examples, batch_size, shuffle):
         self._dataset[set_type] = examples
@@ -97,6 +110,7 @@ class hessianSolver:
         damping_hessian = np_Hessian + damping_matrix
         print("calculating_inv_hessian")
         inv_hessian = np.linalg.inv(damping_hessian)
+        # inv_hessian = np.linalg.inv(np_Hessian)
         print("finished calculating_inv_hessian")
         return inv_hessian
 

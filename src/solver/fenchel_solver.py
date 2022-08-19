@@ -73,15 +73,23 @@ class FenchelSolver:
             TensorDataset(all_inputs, all_labels, all_ids),
             batch_size=batch_size, shuffle=shuffle)
 
-    def get_optimizer_influence(self, lr, momentum, weight_decay):
-        self._optimizer_influence = optim.SGD(
-            self._influence_model.parameters(),
-            lr=lr, momentum=momentum, weight_decay=weight_decay)
+    def get_optimizer_influence(self, lr, momentum, weight_decay, optimizer_influence):
+        if optimizer_influence == "SGD":
+            self._optimizer_influence = optim.SGD(
+                self._influence_model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
+        elif optimizer_influence == "Adam":
+            self._optimizer_influence = optim.Adam(
+                self._influence_model.parameters(), lr=lr, weight_decay=weight_decay)
 
-    def get_optimizer_classification(self, lr, momentum, weight_decay):
-        self._optimizer_classification = optim.SGD(
-            self._classification_model.parameters(),
-            lr=lr, momentum=momentum, weight_decay=weight_decay)
+    def get_optimizer_classification(self, lr, momentum, weight_decay, optimizer_classification):
+        if optimizer_classification == "SGD":
+            self._optimizer_classification = optim.SGD(
+                self._classification_model.parameters(),
+                lr=lr, momentum=momentum, weight_decay=weight_decay)
+        elif optimizer_classification == "Adam":
+            self._optimizer_classification = optim.Adam(
+                self._classification_model.parameters(),
+                lr=lr, weight_decay=weight_decay)
 
     def pretrain_epoch(self):
         self.train_epoch(is_pretrain=True)
@@ -136,7 +144,7 @@ class FenchelSolver:
 
             wandb.log({'uniform_minus_weighted_influence': - \
                       loss_influence, 'classification_loss': loss_classification})
-            if self.global_iter % 200 == 0:
+            if self.global_iter % 20 == 0:
                 pbar.write('[{}] loss_influence: {:.3f}, loss: {:.3F} '.format(
                     self.global_iter, loss_influence, loss_classification))
 
@@ -155,11 +163,16 @@ class FenchelSolver:
         model_tmp = copy.deepcopy(self._classification_model)
         optimizer_hparams = self._optimizer_classification.state_dict()[
             'param_groups'][0]
-        optimizer_tmp = optim.SGD(
-            model_tmp.parameters(),
-            lr=optimizer_hparams['lr'],
-            momentum=optimizer_hparams['momentum'],
-            weight_decay=optimizer_hparams['weight_decay'])
+        if issubclass(type(self._optimizer_classification), torch.optim.Adam):
+            optimizer_tmp = optim.Adam(
+                model_tmp.parameters(), lr=optimizer_hparams['lr'], weight_decay=optimizer_hparams['weight_decay']
+            )
+        elif issubclass(type(self._optimizer_classification), torch.optim.SGD):
+            optimizer_tmp = optim.SGD(
+                model_tmp.parameters(),
+                lr=optimizer_hparams['lr'],
+                momentum=optimizer_hparams['momentum'],
+                weight_decay=optimizer_hparams['weight_decay'])
 
         for i in range(batch_size):
             model_tmp.load_state_dict(self._classification_model.state_dict())
@@ -267,9 +280,7 @@ class FenchelSolver:
     def load_checkpoint_classification(self, file_path):
         if os.path.isfile(file_path):
             checkpoint = torch.load(file_path, map_location='cuda')
-            self.global_epoch = checkpoint['epoch']
             self._classification_model.load_state_dict(checkpoint['model_states']['classification'])
-            self._optimizer_classification.load_state_dict(checkpoint['optim_states']['classification'])
             print(
                 "=> loaded checkpoint '{} (epoch {})'".format(
                     file_path, self.global_epoch))

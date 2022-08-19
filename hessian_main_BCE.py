@@ -15,7 +15,7 @@ from src.data_utils.MnistDataset import MnistDataset
 from src.utils.utils import save_json
 from src.data_utils.Cifar10Dataset import Cifar10Dataset
 from src.solver.hessian_solver_BCE import hessianSolver
-from src.modeling.classification_models import CnnCifar, MNIST_1, MNIST_LogisticRegression, MNIST_Regression_2Layer, CnnMinst
+from src.modeling.classification_models import CnnCisfar, MNIST_1, MNIST_LogisticRegression, MNIST_Regression_2Layer, CnnMinst
 from src.modeling.influence_models import Net_IF, MNIST_IF_1
 from torch.autograd.functional import hessian
 from torch.nn.utils import _stateless

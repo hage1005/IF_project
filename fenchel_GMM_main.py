@@ -171,7 +171,7 @@ if __name__ == "__main__":
     with open(YAMLPath) as file:
         config = yaml.safe_load(file)
         wandb.init(
-            project="IF_PROJECT",
+            project="IF_PROJECT_GMM",
             name=f"{config['dataset_name']}_testId{config['dev_id_num']}_IFlr{config['influence_lr']}_IFlr{config['classification_lr']}_IFwd{config['classification_weight_decay']}_IFmomentum{config['classification_momentum']}_IFdecay{config['influence_weight_decay']}_softmaxTemp{config['softmax_temp']}",
             config=config
         )

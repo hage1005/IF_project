@@ -1,0 +1,25 @@
+# wandb agent influence_function/IF_PROJECT_single_test/kj04g8mr
+program: fenchel_image_main.py
+method: bayes
+project: IF_PROJECT_single_test
+entity: influence_function
+metric:
+  goal: maximize
+  name: correlation_ours
+parameters:
+  classification_model:
+    value: CnnMnist
+  optimizer_classification:
+    values: ["SGD", "Adam"]
+  classification_lr:
+    values: [0.001, 0.01]
+  batch_size:
+    values: [32, 64]
+  optimizer_influence:
+    values: ["SGD", "Adam"]
+  influence_lr:
+    values: [0.01, 0.5]
+  softmax_temp:
+    values: [1, 10]
+  max_pretrain_epoch:
+    values: [0, 1]

@@ -4,7 +4,7 @@ def linear_normalize(weights):
     weights = torch.max(weights, torch.zeros_like(weights))
     if torch.sum(weights) > 1e-8:
         return weights / torch.sum(weights)
-    return torch.zeros_like(weights)
+    return weights
 
 
 def softmax_normalize(weights, temperature):

@@ -73,6 +73,7 @@ class hessianSolver:
 
     def pretrain_epoch(self):
         pbar = tqdm(self._data_loader['train'], desc='Training Epoch')
+        self.global_epoch += 1
         for batch_idx, batch in enumerate(pbar):
             self._optimizer_classification.zero_grad()
             self.global_iter += 1
@@ -104,12 +105,14 @@ class hessianSolver:
 
 
     def calculate_inv_hessian(self):
+        print("Calculating Hessian")
         Hessian = hessian(self.loss, torch.cat(tuple([_.view(-1) for _ in self._classification_model.parameters()])))
         np_Hessian = Hessian.to("cpu").numpy()/len(self._dataset['train'])
         damping_matrix = np.diag(np.full(Hessian.shape[0],0.01),0)
         damping_hessian = np_Hessian + damping_matrix
         print("calculating_inv_hessian")
         inv_hessian = np.linalg.inv(damping_hessian)
+        # print("rank of np_Hessian: ", np.linalg.matrix_rank(np_Hessian))
         # inv_hessian = np.linalg.inv(np_Hessian)
         print("finished calculating_inv_hessian")
         return inv_hessian

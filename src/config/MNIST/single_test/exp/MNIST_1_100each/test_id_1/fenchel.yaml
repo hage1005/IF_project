@@ -4,15 +4,15 @@ train_classes: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 num_per_class: [100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
 classification_model: MNIST_2
 influence_model: hashmap_IF
-max_epoch: 200
+max_epoch: 400
 influence_lr: 0.001
 influence_momentum: 0.9
 influence_weight_decay: 0.01
-optimizer_influence: Adam
+optimizer_influence: SGD
 classification_lr: 0.001
 classification_momentum: 0.9
 classification_weight_decay: 0.01
-optimizer_classification: Adam
+optimizer_classification: SGD
 batch_size: 64
 _hidden_size_classification: 32
 _hidden_size_influence: 32
@@ -32,7 +32,7 @@ _gpu_id: 1
 _ckpt_dir: checkpoints/fenchel/mnist/MNIST_1 #useless
 
 seed: 1
-max_pretrain_epoch: 101
+max_pretrain_epoch: 10
 pretrain_classification_lr: 0.001 #use 0.001 lr and 100epoch for pretrain default
 _pretrain_ckpt_name: classAll100Each.pt #specify the dataset used for training
 

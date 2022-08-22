@@ -108,7 +108,7 @@ class hessianSolver:
         print("Calculating Hessian")
         Hessian = hessian(self.loss, torch.cat(tuple([_.view(-1) for _ in self._classification_model.parameters()])))
         np_Hessian = Hessian.to("cpu").numpy()/len(self._dataset['train'])
-        damping_matrix = np.diag(np.full(Hessian.shape[0],0.01),0)
+        damping_matrix = np.diag(np.full(Hessian.shape[0],0.02),0)
         damping_hessian = np_Hessian + damping_matrix
         print("calculating_inv_hessian")
         inv_hessian = np.linalg.inv(damping_hessian)

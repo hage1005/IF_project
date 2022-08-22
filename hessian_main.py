@@ -74,6 +74,8 @@ def main(args):
         classification_model = MNIST_LogisticRegression(args._num_class).to('cuda')
     elif args.classification_model == 'CnnMnist':
         classification_model = CnnMnist(args._num_class).to('cuda')
+    elif args.classification_model == 'CnnCifar':
+        classification_model = CnnCifar(args._num_class).to('cuda')
     else:
         raise NotImplementedError()
     

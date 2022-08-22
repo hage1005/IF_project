@@ -2,7 +2,7 @@ exp_title: original_config
 dataset_name: mnist
 train_classes: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 num_per_class: [100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
-classification_model: MNIST_2
+classification_model: MNIST_1
 influence_model: hashmap_IF
 max_epoch: 400
 influence_lr: 0.001
@@ -32,7 +32,7 @@ _gpu_id: 1
 _ckpt_dir: checkpoints/fenchel/mnist/MNIST_1 #useless
 
 seed: 1
-max_pretrain_epoch: 10
+max_pretrain_epoch: 100
 pretrain_classification_lr: 0.001 #use 0.001 lr and 100epoch for pretrain default
 _pretrain_ckpt_name: classAll100Each.pt #specify the dataset used for training
 

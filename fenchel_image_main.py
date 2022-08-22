@@ -228,7 +228,8 @@ def main(args, truth_path, Identity_path, base_path):
 
         wandb.log({
                 f'all_{train_dataset_size}_weight_std': torch.std(fenchel_classifier._weights).item(),
-                f'all_{train_dataset_size}_weight_mean': torch.mean(fenchel_classifier._weights).item()
+                f'all_{train_dataset_size}_weight_mean': torch.mean(fenchel_classifier._weights).item(),
+                f'all_{train_dataset_size}_weight_mean_abs': torch.mean(torch.abs(fenchel_classifier._weights)).item(),
             })
 
         """plot helpful"""

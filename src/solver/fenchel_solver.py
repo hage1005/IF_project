@@ -11,7 +11,8 @@ from torch.utils.data import TensorDataset, DataLoader
 from torchvision import models
 
 from .magic_module import MagicModule
-from src.solver.utils import linear_normalize_clip_min, softmax_normalize
+from src.solver.utils import linear_normalize_clip_min, softmax_normalize, linear_normalize
+from torch.optim import lr_scheduler
 
 import wandb
 
@@ -81,7 +82,7 @@ class FenchelSolver:
             self._optimizer_influence = optim.Adam(
                 self._influence_model.parameters(), lr=lr, weight_decay=weight_decay)
 
-    def get_optimizer_classification(self, lr, momentum, weight_decay, optimizer_classification):
+    def get_optimizer_classification_and_scheduler(self, lr, momentum, weight_decay, optimizer_classification, lr_scheduler_step_size, lr_scheduler_gamma):
         if optimizer_classification == "SGD":
             self._optimizer_classification = optim.SGD(
                 self._classification_model.parameters(),
@@ -90,11 +91,22 @@ class FenchelSolver:
             self._optimizer_classification = optim.Adam(
                 self._classification_model.parameters(),
                 lr=lr, weight_decay=weight_decay)
+        self.scheduler_classification = lr_scheduler.StepLR(self._optimizer_classification, step_size = lr_scheduler_step_size, gamma = lr_scheduler_gamma)
 
     def pretrain_epoch(self):
-        self.train_epoch(is_pretrain=True)
+        criterion = nn.CrossEntropyLoss(reduction='none')
+        pbar = tqdm(self._data_loader['train'], desc='Training Epoch')
+        for batch_idx, batch in enumerate(pbar):
+            inputs, labels, ids = tuple(t.to('cuda') for t in batch) # t[0] is input, t[1] is label, t[2] is id
+            self._optimizer_classification.zero_grad()
+            logits = self._classification_model(inputs)
+            loss_classification = criterion(logits, labels)
+            loss_classification = torch.mean(loss_classification)
+            loss_classification.backward()  # theta 3 update
+            self._optimizer_classification.step()
+        self.scheduler_classification.step()
 
-    def train_epoch(self, is_pretrain=False):
+    def train_epoch(self):
         self.global_epoch += 1
         criterion = nn.CrossEntropyLoss(reduction='none')
         pbar = tqdm(self._data_loader['train'], desc='Training Epoch')
@@ -116,13 +128,9 @@ class FenchelSolver:
             loss_influence.backward()  # theta 1 update, todo: does weights change?
             self._optimizer_influence.step()
 
-            if is_pretrain:
-                weights = linear_normalize_clip_min(
-                    torch.ones(inputs.shape[0]).to('cuda'))
-            else:
-                weights = softmax_normalize(
-                    self._get_weights(batch),
-                    temperature=self._softmax_temp)  # theta 2 update
+            weights = softmax_normalize(
+                self._get_weights(batch),
+                temperature=self._softmax_temp)  # theta 2 update
 
             self._optimizer_classification.zero_grad()
             lossHistory = []
@@ -147,6 +155,7 @@ class FenchelSolver:
             if self.global_iter % 20 == 0:
                 pbar.write('[{}] loss_influence: {:.3f}, loss: {:.3F} '.format(
                     self.global_iter, loss_influence, loss_classification))
+            self.scheduler_classification.step()
 
     def _get_weights(self, batch, no_update=False):  # batch is from train set
         self._classification_model.eval()

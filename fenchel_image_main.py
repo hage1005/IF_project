@@ -147,12 +147,13 @@ def main(args, truth_path, Identity_path, base_path):
     pretrain_ckpt_path = os.path.join(ckpt_dir,
     f"epoch{args.max_pretrain_epoch}_lr{args.pretrain_classification_lr}_" + args._pretrain_ckpt_name)
     if not os.path.exists(pretrain_ckpt_path):
-        fenchel_classifier.get_optimizer_classification(
+        fenchel_classifier.get_optimizer_classification_and_scheduler(
             args.pretrain_classification_lr,
             args.classification_momentum,
             args.classification_weight_decay,
-            args.optimizer_classification
-        )
+            args.optimizer_classification,
+            args.max_checkpoint_epoch // 5,
+            0.2)
         for epoch in range(args.max_pretrain_epoch):
             fenchel_classifier.pretrain_epoch()
             dev_acc = fenchel_classifier.evaluate('dev')
@@ -165,13 +166,14 @@ def main(args, truth_path, Identity_path, base_path):
     if args.use_pretrain_classification:
         fenchel_classifier.load_checkpoint_classification(pretrain_ckpt_path)
 
-    fenchel_classifier.get_optimizer_classification(
+    fenchel_classifier.get_optimizer_classification_and_scheduler(
         args.classification_lr,
         args.classification_momentum,
         args.classification_weight_decay,
-        args.optimizer_classification
-    )
-    
+        args.optimizer_classification,
+        args.max_checkpoint_epoch // 5,
+        0.2)
+
     with open (truth_path, "r") as f:
         result_true = json.loads(f.read())
     with open (Identity_path, "r") as f:

@@ -4,13 +4,13 @@ train_classes: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 num_per_class: [100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
 classification_model: MNIST_2
 influence_model: hashmap_IF
-max_epoch: 150
+max_epoch: 400
 influence_lr: 0.01
 influence_momentum: 0.9
 influence_weight_decay: 0.01
 classification_lr: 0.01
 classification_momentum: 0.9
-classification_weight_decay: 0.01
+classification_weight_decay: 0.005
 batch_size: 32
 _hidden_size_classification: 32
 _hidden_size_influence: 32

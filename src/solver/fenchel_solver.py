@@ -11,7 +11,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from torchvision import models
 
 from .magic_module import MagicModule
-from src.solver.utils import linear_normalize, softmax_normalize
+from src.solver.utils import linear_normalize_clip_min, softmax_normalize
 
 import wandb
 
@@ -103,7 +103,7 @@ class FenchelSolver:
             inputs, labels, ids = tuple(t.to('cuda') for t in batch) # t[0] is input, t[1] is label, t[2] is id
             self.global_iter += 1
 
-            weights = linear_normalize(self._weights[ids].detach() )
+            weights = linear_normalize_clip_min(self._weights[ids].detach() )
 
             wandb.log({'weights_std': torch.std(weights), 'batch_idx': batch_idx, 'epoch': self.global_epoch})
             self._optimizer_influence.zero_grad()
@@ -117,7 +117,7 @@ class FenchelSolver:
             self._optimizer_influence.step()
 
             if is_pretrain:
-                weights = linear_normalize(
+                weights = linear_normalize_clip_min(
                     torch.ones(inputs.shape[0]).to('cuda'))
             else:
                 weights = softmax_normalize(

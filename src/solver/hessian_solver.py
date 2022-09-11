@@ -24,9 +24,9 @@ from torch.nn import CrossEntropyLoss
 import torch.nn.functional as F
 from torch.nn.utils import _stateless
 from torch.utils.data import TensorDataset, DataLoader
+from torch.optim import lr_scheduler
 
 
-    
 class hessianSolver:
     def __init__(self, classification_model, inv_hessian_path, pretrained_classification_path):
         self._classification_model = classification_model
@@ -42,15 +42,8 @@ class hessianSolver:
         self._optimizer_classification = None
 
 
-    def get_optimizer_influence(self, lr, momentum, weight_decay, optimizer_influence):
-        if optimizer_influence == "SGD":
-            self._optimizer_influence = optim.SGD(
-                self._influence_model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
-        elif optimizer_influence == "Adam":
-            self._optimizer_influence = optim.Adam(
-                self._influence_model.parameters(), lr=lr, weight_decay=weight_decay)
 
-    def get_optimizer_classification(self, lr, momentum, weight_decay, optimizer_classification):
+    def get_optimizer_classification(self, lr, momentum, weight_decay, optimizer_classification, lr_scheduler_step_size, lr_scheduler_gamma):
         if optimizer_classification == "SGD":
             self._optimizer_classification = optim.SGD(
                 self._classification_model.parameters(),
@@ -59,6 +52,7 @@ class hessianSolver:
             self._optimizer_classification = optim.Adam(
                 self._classification_model.parameters(),
                 lr=lr, weight_decay=weight_decay)
+        self.scheduler_classification = lr_scheduler.StepLR(self._optimizer_classification, step_size = lr_scheduler_step_size, gamma = lr_scheduler_gamma)
 
     def load_data(self, set_type, examples, batch_size, shuffle):
         self._dataset[set_type] = examples
@@ -85,6 +79,7 @@ class hessianSolver:
             if self.global_iter % 20 == 0:
                 pbar.write('[{}] loss: {:.3F} '.format(
                     self.global_iter, loss_classification))
+        self.scheduler_classification.step()
     
     def loss(self, params):
         print(params.shape)
@@ -108,7 +103,7 @@ class hessianSolver:
         print("Calculating Hessian")
         Hessian = hessian(self.loss, torch.cat(tuple([_.view(-1) for _ in self._classification_model.parameters()])))
         np_Hessian = Hessian.to("cpu").numpy()/len(self._dataset['train'])
-        damping_matrix = np.diag(np.full(Hessian.shape[0],0.02),0)
+        damping_matrix = np.diag(np.full(Hessian.shape[0],0.01),0)
         damping_hessian = np_Hessian + damping_matrix
         print("calculating_inv_hessian")
         inv_hessian = np.linalg.inv(damping_hessian)

@@ -89,7 +89,7 @@ def main(args):
     ckpt_dir = os.path.join("checkpoints/fenchel", args.dataset_name, args.classification_model)
     os.makedirs(ckpt_dir, exist_ok=True)
     pretrain_ckpt_path = os.path.join(ckpt_dir,
-    f"epoch{args.max_pretrain_epoch}_lr{args.pretrain_classification_lr}_" + args._pretrain_ckpt_name )
+    f"epoch{args.max_checkpoint_epoch}_lr{args.pretrain_classification_lr}_" + args._pretrain_ckpt_name )
     inv_hessian_path = os.path.join(ckpt_dir, "numpy_inv_hessian_" + os.path.basename(pretrain_ckpt_path))
     hessian_solver = hessianSolver(classification_model, pretrain_ckpt_path, inv_hessian_path)
     hessian_solver.load_data('train', train_dataset, 32, shuffle= True)
@@ -101,9 +101,11 @@ def main(args):
         args.classification_lr,
         args.classification_momentum,
         args.classification_weight_decay,
-        args.optimizer_classification)
+        args.optimizer_classification,
+        args.max_checkpoint_epoch // 5,
+        0.2)
 
-        for epoch in range(args.max_pretrain_epoch):
+        for epoch in range(args.max_checkpoint_epoch):
             hessian_solver.pretrain_epoch()
             dev_acc = hessian_solver.evaluate('dev')
             print('Pre-train Epoch {}, dev Acc: {:.4f}'.format(
@@ -163,7 +165,7 @@ def main(args):
             args.dataset_name,
             args.classification_model,
             "dev_id_" + str(args.dev_id_num),
-            f"pretrain{args.max_pretrain_epoch}epoch",
+            f"pretrain{args.max_checkpoint_epoch}epoch",
             f"{method}.json")
         os.makedirs(os.path.dirname(json_path), exist_ok=True)
         save_json(result, json_path)

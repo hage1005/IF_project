@@ -310,7 +310,7 @@ if __name__ == "__main__":
         args.dataset_name,
         args.classification_model,
         "dev_id_" + str(args.dev_id_num),
-        f"pretrain{100}epoch"
+        f"pretrain{args.max_checkpoint_epoch}epoch"
     )
     truth_path = os.path.join(base_path_truth, "Percy.json")
     Identity_path = os.path.join(base_path_truth, "Identity.json")
@@ -319,7 +319,7 @@ if __name__ == "__main__":
         args.dataset_name,
         args.classification_model,
         "dev_id_" + str(args.dev_id_num),
-        f"pretrain{args.max_pretrain_epoch}epoch"
+        f"pretrain{args.max_checkpoint_epoch}epoch"
     )
     if not os.path.exists(truth_path): #first get the truth and identity hessian
         hessian_main(args)

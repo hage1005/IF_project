@@ -19,7 +19,7 @@ _hidden_size_influence: 32
 dataWeight_weight_decay: 1 # 1 means no weight decay equation: w / decay
 dataWeight_weight_init: 0.
 softmax_temp: 10
-train_classification_till_converge: True
+train_classification_till_converge: False
 use_pretrain_classification: True
 reset_pretrain_classification_every_epoch: False
 clip_min_weight: False
@@ -28,7 +28,7 @@ dev_original_folder: data/MNIST/dev/oneClassEach/original_sampled
 dev_transformed_folder: data/MNIST/dev/oneClassEach/transformed_sampled #useless now
 test_original_folder: "" #useless now
 test_transformed_folder: "" #useless now
-_gpu_id: 3
+_gpu_id: 5
 _ckpt_dir: checkpoints/fenchel/mnist/MNIST_1 #useless
 
 seed: 1
@@ -37,5 +37,7 @@ max_checkpoint_epoch: 1600
 pretrain_classification_lr: 0.001 #use 0.001 lr and 100epoch for pretrain default
 _pretrain_ckpt_name: classAll100Each.pt #specify the dataset used for training
 
+normalize_fn_classification: softmax
+normalize_fn_influence: linear_clip_min
 _num_class: 10 # the maximum number of class
 _ckpt_name: last

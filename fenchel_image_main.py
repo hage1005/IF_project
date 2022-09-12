@@ -18,6 +18,7 @@ from src.data_utils.Cifar10Dataset import Cifar10Dataset
 from src.solver.fenchel_solver import FenchelSolver
 from src.modeling.classification_models import CnnCifar, MNIST_1, MNIST_2, CnnMnist
 from src.modeling.influence_models import Net_IF, MNIST_IF_1, hashmap_IF
+from src.solver.utils import Normalizer
 
 from hessian_main import main as hessian_main
 import wandb
@@ -105,12 +106,17 @@ def main(args, truth_path, Identity_path, base_path):
     else:
         raise NotImplementedError()
 
+    normalize_fn_classification = Normalizer(args.normalize_fn_classification, args.softmax_temp)
+    normalize_fn_influence = Normalizer(args.normalize_fn_influence, args.softmax_temp)
+
     fenchel_classifier = FenchelSolver(
         x_dev,
         y_dev,
         classification_model=classification_model,
         influence_model=influence_model,
         is_influence_model_hashmap=is_influence_model_hashmap,
+        normalize_fn_classification = normalize_fn_classification,
+        normalize_fn_influence = normalize_fn_influence,
         softmax_temp=args.softmax_temp,
         train_classification_till_converge=args.train_classification_till_converge,
         clip_min_weight=args.clip_min_weight)
@@ -153,7 +159,7 @@ def main(args, truth_path, Identity_path, base_path):
             args.classification_weight_decay,
             args.optimizer_classification,
             args.max_checkpoint_epoch // 5,
-            0.2)
+            0.8)
         for epoch in range(args.max_pretrain_epoch):
             fenchel_classifier.pretrain_epoch()
             dev_acc = fenchel_classifier.evaluate('dev')
@@ -172,7 +178,7 @@ def main(args, truth_path, Identity_path, base_path):
         args.classification_weight_decay,
         args.optimizer_classification,
         args.max_checkpoint_epoch // 5,
-        0.2)
+        0.8)
 
     with open (truth_path, "r") as f:
         result_true = json.loads(f.read())

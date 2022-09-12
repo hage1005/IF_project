@@ -11,7 +11,6 @@ from torch.utils.data import TensorDataset, DataLoader
 from torchvision import models
 
 from .magic_module import MagicModule
-from src.solver.utils import linear_normalize_clip_min, softmax_normalize, linear_normalize
 from torch.optim import lr_scheduler
 
 import wandb
@@ -27,10 +26,12 @@ class FenchelSolver:
             classification_model,
             influence_model,
             is_influence_model_hashmap,
-            pretrained=True,
+            normalize_fn_classification,
+            normalize_fn_influence,
             softmax_temp=1.,
             train_classification_till_converge=False,
-            clip_min_weight=True):
+            clip_min_weight=True,
+            ):
 
         self._influence_model = influence_model
         self._classification_model = classification_model
@@ -54,6 +55,9 @@ class FenchelSolver:
         self.train_classification_till_converge = train_classification_till_converge
         self.clip_min_weight = clip_min_weight
         self.is_influence_model_hashmap = is_influence_model_hashmap
+
+        self.normalize_fn_classification = normalize_fn_classification
+        self.normalize_fn_influence = normalize_fn_influence
 
         self.first_iteration_grad = None
 
@@ -115,7 +119,7 @@ class FenchelSolver:
             inputs, labels, ids = tuple(t.to('cuda') for t in batch) # t[0] is input, t[1] is label, t[2] is id
             self.global_iter += 1
 
-            weights = linear_normalize_clip_min(self._weights[ids].detach() )
+            weights = self.normalize_fn_influence(self._weights[ids].detach() )
 
             wandb.log({'weights_std': torch.std(weights), 'batch_idx': batch_idx, 'epoch': self.global_epoch})
             self._optimizer_influence.zero_grad()
@@ -128,9 +132,9 @@ class FenchelSolver:
             loss_influence.backward()  # theta 1 update, todo: does weights change?
             self._optimizer_influence.step()
 
-            weights = softmax_normalize(
+            weights = self.normalize_fn_classification(
                 self._get_weights(batch),
-                temperature=self._softmax_temp)  # theta 2 update
+                )  # theta 2 update
 
             self._optimizer_classification.zero_grad()
             lossHistory = []
@@ -147,7 +151,7 @@ class FenchelSolver:
 
                 # compare the variance of last 5 loss
                 if len(lossHistory) > 5:
-                    if torch.var(torch.stack(lossHistory[-5:])).item() < 0.1:
+                    if torch.var(torch.stack(lossHistory[-5:])).item() < 0.01:
                         break
 
             wandb.log({'uniform_minus_weighted_influence': - \
@@ -220,9 +224,7 @@ class FenchelSolver:
         dev_loss = criterion(dev_logits,
                               self.y_dev.long())  # the third term
     
-        weights_tmp = softmax_normalize(
-            weights,
-            temperature=self._softmax_temp)
+        weights_tmp = self.normalize_fn_classification(weights)
 
         if self.is_influence_model_hashmap:
             weighted_influence = torch.sum(self._influence_model(ids).squeeze().detach() * weights_tmp)

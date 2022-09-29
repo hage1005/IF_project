@@ -193,9 +193,13 @@ def main(args, truth_path, Identity_path, base_path):
         wandb.run.summary[f"{y_label} {x_label} {epoch} corr"] = corr
         return corr
     
-    x = result_identity['influence']
-    y = result_true['influence']
-    draw_scatter(x, y, 'identity', 'invHessian')
+    x = np.array(result_identity['influence'])
+    influence_true = np.array(result_true['influence'])
+    draw_scatter(x, influence_true, 'identity', 'invHessian')
+
+    y_idx_helpful_and_harmful = result_true['helpful'][:10] + result_true['harmful'][:10]
+    draw_scatter(x[y_idx_helpful_and_harmful], influence_true[y_idx_helpful_and_harmful], 'identity', 'invHessian top10', epoch = 0)
+
     for epoch in range(args.max_epoch):
         if args.reset_pretrain_classification_every_epoch and epoch > 0:
             fenchel_classifier.load_checkpoint_classification(pretrain_ckpt_path)
@@ -226,8 +230,8 @@ def main(args, truth_path, Identity_path, base_path):
         save_result(influences, os.path.join(base_path, args.influence_model, f"epoch{epoch}.json"))
         if epoch == 0:
             x = fenchel_classifier.first_iteration_grad.cpu().detach().numpy()
-            y = result_true['influence']
-            corr = draw_scatter(x, y, "first_iter_grad", "invHessian")
+            corr = draw_scatter(x, influence_true, "first_iter_grad", "invHessian")
+            draw_scatter(x[y_idx_helpful_and_harmful], influence_true[y_idx_helpful_and_harmful], "first_iter_grad", "invHessian top10")
             save_result(fenchel_classifier.first_iteration_grad.cpu().detach(), 
                 os.path.join(base_path, f"first_iteration_grad.json"))
             save_json({},os.path.join(base_path, f"first_iteration_grad_lr{args.classification_lr}_epoch{args.max_pretrain_epoch}_corr{corr}.json"))
@@ -284,15 +288,15 @@ def main(args, truth_path, Identity_path, base_path):
         x = influences
         y = result_true['influence']
         wandb.log({'correlation_ours': round(np.corrcoef(x, y)[0, 1], 3)})
-        if epoch % 20 == 0:
+        wandb.log({'correlation_ours_top10': round(np.corrcoef(x[y_idx_helpful_and_harmful], influence_true[y_idx_helpful_and_harmful])[0, 1], 3)})
+        if epoch % 40 == 0:
             x = influences
-            y = result_true['influence']
-            draw_scatter(x, y, 'ours', 'invHessian', epoch)
+            draw_scatter(x, influence_true, 'ours', 'invHessian', epoch)
+            draw_scatter(x[y_idx_helpful_and_harmful], influence_true[y_idx_helpful_and_harmful], 'ours', 'invHessian top10', epoch)
 
             x = influences
             y = result_identity['influence']
             draw_scatter(x, y, 'ours', 'identity', epoch)
-            
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

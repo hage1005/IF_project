@@ -22,13 +22,13 @@ softmax_temp: 10
 train_classification_till_converge: False
 use_pretrain_classification: True
 reset_pretrain_classification_every_epoch: False
-clip_min_weight: False
+clip_min_weight: True
 dev_id_num: 1
 dev_original_folder: data/MNIST/dev/oneClassEach/original_sampled
 dev_transformed_folder: data/MNIST/dev/oneClassEach/transformed_sampled #useless now
 test_original_folder: "" #useless now
 test_transformed_folder: "" #useless now
-_gpu_id: 5
+_gpu_id: 4
 _ckpt_dir: checkpoints/fenchel/mnist/MNIST_1 #useless
 
 seed: 1

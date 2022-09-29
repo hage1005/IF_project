@@ -137,22 +137,32 @@ class FenchelSolver:
                 )  # theta 2 update
 
             self._optimizer_classification.zero_grad()
-            lossHistory = []
-            while True:
-                logits = self._classification_model(inputs)
-                loss_classification = criterion(logits, labels)
-                loss_classification = torch.sum(
-                    loss_classification * weights.data)
-                loss_classification.backward()  # theta 3 update
-                self._optimizer_classification.step()
-                if loss_classification.isnan() or not self.train_classification_till_converge:
-                    break
-                lossHistory.append(loss_classification)
-
-                # compare the variance of last 5 loss
-                if len(lossHistory) > 5:
-                    if torch.var(torch.stack(lossHistory[-5:])).item() < 0.01:
+            # while True:
+            logits = self._classification_model(inputs)
+            loss_classification = criterion(logits, labels)
+            loss_classification = torch.sum(
+                loss_classification * weights.data)
+            loss_classification.backward()  # theta 3 update
+            self._optimizer_classification.step()
+            if self.train_classification_till_converge:
+                lossHistory = []
+                while True:
+                    loss_classification_total = 0
+                    for batch_idx, batch in enumerate(self._data_loader['train']):
+                        inputs, labels, ids = tuple(t.to('cuda') for t in batch) # t[0] is input, t[1] is label, t[2] is id
+                        weights = self.normalize_fn_classification(self._weights[ids].detach() )
+                        self._optimizer_classification.zero_grad()
+                        logits = self._classification_model(inputs)
+                        loss_classification = criterion(logits, labels)
+                        loss_classification = torch.sum(loss_classification * weights.data)
+                        loss_classification.backward()  # theta 3 update
+                        loss_classification_total += loss_classification
+                        self._optimizer_classification.step()
+                    lossHistory.append(loss_classification_total)
+                    # compare the variance of last 5 loss
+                    if len(lossHistory) > 5 and torch.std(torch.stack(lossHistory[-5:])).item() < 0.05:
                         break
+
 
             wandb.log({'uniform_minus_weighted_influence': - \
                       loss_influence, 'classification_loss': loss_classification})

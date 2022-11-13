@@ -201,6 +201,8 @@ def main(args, truth_path, Identity_path, base_path):
     draw_scatter(x[y_idx_helpful_and_harmful], influence_true[y_idx_helpful_and_harmful], 'identity', 'invHessian top10', epoch = 0)
 
     for epoch in range(args.max_epoch):
+        if epoch == 100:
+            print("stop")
         if args.reset_pretrain_classification_every_epoch and epoch > 0:
             fenchel_classifier.load_checkpoint_classification(pretrain_ckpt_path)
         fenchel_classifier.train_epoch()
@@ -266,23 +268,24 @@ def main(args, truth_path, Identity_path, base_path):
         wandb.log({f"harmful_image_for_{CLASS_MAP[y_dev.item()]}": fig})
         plt.clf()
 
-        """plot histogram"""
-        cmap = plt.cm.get_cmap('hsv', len(args.train_classes))
-        colors = [cmap(i) for i in range(len(args.train_classes))]
-        n_bins = 10
-        all_labels = train_dataset[:][1].numpy()
-        indset= sorted(list(set(all_labels)))
-        indmap = {indset[i]: i for i in range(len(indset))}
-        x = [[] for _ in  range(len(indset))]
-        for i in range(train_dataset_size):
-            x[indmap[all_labels[i]]].append(influences[i])
-        plt.hist(x, n_bins, density=True, histtype='bar', color=colors, label = args.train_classes, stacked = True)
-        plt.legend(prop={'size': 10})
-        try:
-            wandb.log({'histogram_influence': plt})
-        except:
-            pass
+        """plot scatter plot, y is influence and x is id"""
+        x = list(range(train_dataset_size))
+        y = influences
+        plt.scatter(x, y)
+        plt.xlabel("id")
+        plt.ylabel("influence")
+        wandb.log({f"scatter_plot_influence": plt})
         plt.clf()
+
+        """plot scatter plot, y is weight and x is id"""
+        x = list(range(train_dataset_size))
+        y = fenchel_classifier._weights.cpu().detach().numpy()
+        plt.scatter(x, y)
+        plt.xlabel("id")
+        plt.ylabel("weight")
+        wandb.log({f"scatter_plot_weight": plt})
+        plt.clf()
+
 
         """plot influence"""
         x = influences
@@ -297,6 +300,11 @@ def main(args, truth_path, Identity_path, base_path):
             x = influences
             y = result_identity['influence']
             draw_scatter(x, y, 'ours', 'identity', epoch)
+
+            y = fenchel_classifier._weights.cpu().detach().numpy()
+            draw_scatter(x, y, 'ours', 'weight', epoch)
+    
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

@@ -11,9 +11,6 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "env": {
-                "CUDA_VISIBLE_DEVICES": "1"
-            }
         }
     ]
 }

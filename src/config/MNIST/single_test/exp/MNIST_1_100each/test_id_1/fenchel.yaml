@@ -7,7 +7,7 @@ influence_model: hashmap_IF
 max_epoch: 400
 influence_lr: 0.001
 influence_momentum: 0.9
-influence_weight_decay: 0.005
+influence_weight_decay: 0.
 optimizer_influence: SGD
 classification_lr: 0.001
 classification_momentum: 0.9
@@ -28,7 +28,7 @@ dev_original_folder: data/MNIST/dev/oneClassEach/original_sampled
 dev_transformed_folder: data/MNIST/dev/oneClassEach/transformed_sampled #useless now
 test_original_folder: "" #useless now
 test_transformed_folder: "" #useless now
-_gpu_id: 4
+_gpu_id: 6
 _ckpt_dir: checkpoints/fenchel/mnist/MNIST_1 #useless
 
 seed: 1
@@ -38,6 +38,6 @@ pretrain_classification_lr: 0.001 #use 0.001 lr and 100epoch for pretrain defaul
 _pretrain_ckpt_name: classAll100Each.pt #specify the dataset used for training
 
 normalize_fn_classification: softmax
-normalize_fn_influence: linear_clip_min
+normalize_fn_influence: linear
 _num_class: 10 # the maximum number of class
 _ckpt_name: last

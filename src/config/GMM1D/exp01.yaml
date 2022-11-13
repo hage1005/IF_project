@@ -12,7 +12,7 @@ classification_weight_decay: 0.01
 influence_weight_decay: 10.
 influence_weight_init: 0.
 softmax_temp: 1
-test_id_num: 0
+dev_id_num: 0
 seed: 1
 _gpu_id: 1
 _ckpt_dir: checkpoints/fenchel/

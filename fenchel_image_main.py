@@ -14,6 +14,7 @@ import torch
 from torchvision import models, transforms
 from src.data_utils.MnistDataset import MnistDataset
 from src.utils.utils import save_json
+from src.utils.plot import draw_scatter, plot_nine_images, plot_scatter
 from src.data_utils.Cifar10Dataset import Cifar10Dataset
 from src.solver.fenchel_solver import FenchelSolver
 from src.modeling.classification_models import CnnCifar, MNIST_1, MNIST_2, CnnMnist
@@ -175,14 +176,6 @@ def main(args, truth_path, Identity_path, base_path):
     with open (Identity_path, "r") as f:
         result_identity = json.loads(f.read())
     
-    def draw_scatter(x, y, x_label, y_label, epoch = 0):
-        corr = round(np.corrcoef(x,y)[0,1],3)
-        data = [[x, y] for (x, y) in zip(x, y)]
-        table = wandb.Table(data=data, columns = [x_label, y_label])
-        wandb.log({ f"{y_label} {x_label} epoch{epoch}" : wandb.plot.scatter(table, x_label, y_label, title=f"{y_label} {x_label} corr:{corr} epoch{epoch}")})
-        wandb.run.summary[f"{y_label} {x_label} {epoch} corr"] = corr
-        return corr
-    
     x = np.array(result_identity['influence'])
     influence_true = np.array(result_true['influence'])
     draw_scatter(x, influence_true, 'identity', 'invHessian')
@@ -236,45 +229,29 @@ def main(args, truth_path, Identity_path, base_path):
                 f'all_{train_dataset_size}_weight_mean_abs': torch.mean(torch.abs(fenchel_classifier._weights)).item(),
             })
 
-        """plot helpful"""
         helpful = np.argsort(influences)
-        harmful = helpful[::-1]
-        fig = plt.figure(figsize=(6, 7))
-        for i in range(1, 10):
-            x, y = train_dataset_no_transform[helpful[i]]
-            fig.add_subplot(3, 3, i)
-            plt.title(f"{CLASS_MAP[y]}_{influences[helpful[i]]:.2f}")
-            plt.imshow(x.permute(1, 2, 0))
-        wandb.log({f"helpful_image_for_{CLASS_MAP[y_dev.item()]}": fig})
+
+        """plot helpful"""
+        top_9_ind = helpful[:9]
+        images, labels = train_dataset_no_transform[top_9_ind]
+
+        ys = [f"{CLASS_MAP[c]}_{influences[idx]:.2f}" for c, idx in zip(labels, top_9_ind)]
+        plot_nine_images(images, ys, f"helpful_image_for_{CLASS_MAP[y_dev.item()]}")
 
         """plot harmful"""
-        plt.clf()
-        fig = plt.figure(figsize=(6, 7))
-        for i in range(1, 10):
-            x, y = train_dataset_no_transform[harmful[i]]
-            fig.add_subplot(3, 3, i)
-            plt.title(f"{CLASS_MAP[y]}_{influences[harmful[i]]:.2f}")
-            plt.imshow(x.permute(1, 2, 0))
-        wandb.log({f"harmful_image_for_{CLASS_MAP[y_dev.item()]}": fig})
-        plt.clf()
+        top_9_ind = helpful[-9:]
+        images, labels = train_dataset_no_transform[top_9_ind]
+
+        ys = [f"{CLASS_MAP[c]}_{influences[idx]:.2f}" for c, idx in zip(labels, top_9_ind)]
+        plot_nine_images(images, ys, f"harmful_image_for_{CLASS_MAP[y_dev.item()]}")
 
         """plot scatter plot, y is influence and x is id"""
-        x = list(range(train_dataset_size))
-        y = influences
-        plt.scatter(x, y)
-        plt.xlabel("id")
-        plt.ylabel("influence")
-        wandb.log({f"scatter_plot_influence": plt})
-        plt.clf()
+
+        plot_scatter(list(range(train_dataset_size)), influences, "id", "influence", f"scatter_plot_influence")
 
         """plot scatter plot, y is weight and x is id"""
-        x = list(range(train_dataset_size))
-        y = fenchel_classifier._weights.cpu().detach().numpy()
-        plt.scatter(x, y)
-        plt.xlabel("id")
-        plt.ylabel("weight")
-        wandb.log({f"scatter_plot_weight": plt})
-        plt.clf()
+
+        plot_scatter(list(range(train_dataset_size)), fenchel_classifier._weights.cpu().detach().numpy(), "id", "weight", f"scatter_plot_weight")
 
 
         """plot influence"""

@@ -47,29 +47,19 @@ def main(args, truth_path, Identity_path, base_path):
 
     if args.dataset_name == 'cifar10':
         Dataset = Cifar10Dataset
-        trans = transforms.Compose([ 
-            transforms.ToTensor(), 
-            transforms.Normalize(
-            (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-            ])
     elif args.dataset_name == 'mnist':
         Dataset = MnistDataset
-        trans = transforms.Compose([ 
-            transforms.ToTensor(), 
-            transforms.Normalize(
-            (0.1307,),(0.3081,))
-            ])
     else:
         raise NotImplementedError()
 
     class_label_dict = Dataset.get_class_label_dict()
     CLASS_MAP = Dataset.get_class_map()
     train_classes = [class_label_dict[c] for c in args.train_classes]
-    ImageDataset = Dataset(args.dev_original_folder, args.dev_transformed_folder, args.test_original_folder, args.test_transformed_folder, train_classes, trans, args.num_per_class)
+    ImageDataset = Dataset(args.dev_original_folder, train_classes, args.num_per_class)
 
 
-    train_dataset, train_dataset_no_transform = ImageDataset.get_train()
-    dev_dataset, dev_dataset_no_transform = ImageDataset.get_dev()
+    train_dataset, train_dataset_no_transform = ImageDataset.get_data("train"), ImageDataset.get_data("train", transform=False)
+    dev_dataset, dev_dataset_no_transform = ImageDataset.get_data("dev"), ImageDataset.get_data("dev", transform=False)
     # test_dataset, test_dataset_no_transform = ImageDataset.get_test()
     train_dataset_size = len(train_dataset)
 
@@ -151,7 +141,7 @@ def main(args, truth_path, Identity_path, base_path):
     ckpt_dir = os.path.join("checkpoints/fenchel", args.dataset_name, args.classification_model)
     os.makedirs(ckpt_dir, exist_ok=True)
     pretrain_ckpt_path = os.path.join(ckpt_dir,
-    f"epoch{args.max_pretrain_epoch}_lr{args.pretrain_classification_lr}_" + args._pretrain_ckpt_name)
+    f"epoch{args.max_pretrain_epoch}_lr{args.pretrain_classification_lr}_{args._pretrain_ckpt_name}")
     if not os.path.exists(pretrain_ckpt_path):
         fenchel_classifier.get_optimizer_classification_and_scheduler(
             args.pretrain_classification_lr,

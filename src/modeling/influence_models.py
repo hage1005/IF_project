@@ -6,6 +6,23 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+def get_influence_model(name, num_class, train_dataset_size, hidden_size):
+    is_influence_model_hashmap = False
+    if name == 'Net_IF':
+        influence_model = Net_IF(num_class).to('cuda')
+    elif name == 'MNIST_IF_1':
+        if hidden_size is None:
+            raise ValueError('hidden_size must be specified for MNIST_IF_1')
+        influence_model = MNIST_IF_1(hidden_size, num_class).to('cuda')
+    elif name == 'hashmap_IF':
+        if train_dataset_size is None:
+            raise ValueError('train_dataset_size must be specified for hashmap_IF')
+        influence_model = hashmap_IF(train_dataset_size).to('cuda')
+        is_influence_model_hashmap = True
+    else:
+        raise NotImplementedError()
+    return influence_model, is_influence_model_hashmap
+
 
 class Net_IF(nn.Module):
     def __init__(self, num_classes, out_dim=1):

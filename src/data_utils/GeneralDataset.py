@@ -2,7 +2,6 @@ import torch
 from torch.utils.data import TensorDataset
 
 
-## get_data() : string type -> TensorDataset, apply transform
 
 class GeneralDataset:
 
@@ -30,3 +29,5 @@ class GeneralDataset:
         return torch.stack([transform(x) for x in data_raw])
     
     
+
+## get_data() : string type -> TensorDataset, apply transform

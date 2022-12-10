@@ -11,15 +11,13 @@ import copy
 import numpy as np
 import torch
 
-from torchvision import models, transforms
-from src.data_utils.MnistDataset import MnistDataset
+from src.data_utils.index import get_dataset
 from src.utils.utils import save_json
 from src.utils.Plotter_IF import Plotter_IF
 from src.utils.JsonSaver_IF import JsonSaver_IF
-from src.data_utils.Cifar10Dataset import Cifar10Dataset
 from src.solver.fenchel_solver import FenchelSolver
-from src.modeling.classification_models import CnnCifar, MNIST_1, MNIST_2, CnnMnist
-from src.modeling.influence_models import Net_IF, MNIST_IF_1, hashmap_IF
+from src.modeling.classification_models import get_classification_model
+from src.modeling.influence_models import get_influence_model
 from src.solver.utils import Normalizer
 
 from hessian_main import main as hessian_main
@@ -46,13 +44,8 @@ def main(args, truth_path, Identity_path, base_path):
         x = x.unsqueeze(0)
         y = torch.LongTensor([y])
         return x, y
-
-    if args.dataset_name == 'cifar10':
-        Dataset = Cifar10Dataset
-    elif args.dataset_name == 'mnist':
-        Dataset = MnistDataset
-    else:
-        raise NotImplementedError()
+    
+    Dataset, dataset_type = get_dataset(args.dataset_name)
 
     class_label_dict = Dataset.get_class_label_dict()
     CLASS_MAP = Dataset.get_class_map()
@@ -72,32 +65,9 @@ def main(args, truth_path, Identity_path, base_path):
     wandb.run.summary['test_image'] = wandb.Image(
         x_dev, caption={'label': CLASS_MAP[y_dev.item()]})
 
-    if args.classification_model == 'Resnet34':
-        classification_model = models.resnet34(pretrained=True).to('cuda')
-        classification_model.fc = torch.nn.Linear(
-            classification_model.fc.in_features,
-            args._num_class).to('cuda')
-    elif args.classification_model == 'CnnCifar':
-        classification_model = CnnCifar(args._num_class).to('cuda')
-    elif args.classification_model == 'MNIST_1':
-        classification_model = MNIST_1(args._hidden_size_classification, args._num_class).to('cuda')
-    elif args.classification_model == 'MNIST_2':
-        classification_model = MNIST_2(args._num_class).to('cuda')
-    elif args.classification_model == 'CnnMnist':
-        classification_model = CnnMnist(args._num_class).to('cuda')
-    else:
-        raise NotImplementedError()
+    classification_model = get_classification_model(args.classification_model, args._num_class)
 
-    is_influence_model_hashmap = False
-    if args.influence_model == 'Net_IF':
-        influence_model = Net_IF(args._num_class).to('cuda')
-    elif args.influence_model == 'MNIST_IF_1':
-        influence_model = MNIST_IF_1(args._hidden_size_influence, args._num_class).to('cuda')
-    elif args.influence_model == 'hashmap_IF':
-        influence_model = hashmap_IF(train_dataset_size).to('cuda')
-        is_influence_model_hashmap = True
-    else:
-        raise NotImplementedError()
+    influence_model, is_influence_model_hashmap = get_influence_model(args.influence_model, args._num_class, train_dataset_size, args._hidden_size_influence)
 
     normalize_fn_classification = Normalizer(args.normalize_fn_classification, args.softmax_temp)
     normalize_fn_influence = Normalizer(args.normalize_fn_influence, args.softmax_temp)
@@ -201,8 +171,9 @@ def main(args, truth_path, Identity_path, base_path):
             JsonSaver.save_first_iter_grad(fenchel_classifier.first_iteration_grad.cpu().detach().numpy())
 
         Plotter.log_weight_stat(fenchel_classifier._weights.cpu().detach().numpy())
-        
-        Plotter.image_helpful_and_harmful_top_nine(influences)
+
+        if dataset_type == "image":
+            Plotter.image_helpful_and_harmful_top_nine(influences)
 
         Plotter.plot_influence(influences)
 

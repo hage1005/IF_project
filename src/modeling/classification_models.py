@@ -5,9 +5,28 @@ import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from torchvision import models, transforms
 
 
 # 1 layer cnn for mnist
+def get_classification_model(name, num_class, hidden_size=100):
+    if name == 'Resnet34':
+        classification_model = models.resnet34(pretrained=True).to('cuda')
+        classification_model.fc = torch.nn.Linear(
+            classification_model.fc.in_features,
+            num_class).to('cuda')
+    elif name == 'CnnCifar':
+        classification_model = CnnCifar(num_class).to('cuda')
+    elif name == 'MNIST_1':
+        classification_model = MNIST_1(hidden_size, num_class).to('cuda')
+    elif name == 'MNIST_2':
+        classification_model = MNIST_2(num_class).to('cuda')
+    elif name == 'CnnMnist':
+        classification_model = CnnMnist(num_class).to('cuda')
+    else:
+        raise NotImplementedError()
+    return classification_model
+
 class CnnMnist(nn.Module):
     def __init__(self, out_dim):
         super(CnnMnist, self).__init__()

@@ -14,7 +14,8 @@ import torch
 from torchvision import models, transforms
 from src.data_utils.MnistDataset import MnistDataset
 from src.utils.utils import save_json
-from src.utils.plot import draw_scatter, plot_nine_images, plot_scatter
+from src.utils.Plotter_IF import Plotter_IF
+from src.utils.JsonSaver_IF import JsonSaver_IF
 from src.data_utils.Cifar10Dataset import Cifar10Dataset
 from src.solver.fenchel_solver import FenchelSolver
 from src.modeling.classification_models import CnnCifar, MNIST_1, MNIST_2, CnnMnist
@@ -62,6 +63,7 @@ def main(args, truth_path, Identity_path, base_path):
     train_dataset, train_dataset_no_transform = ImageDataset.get_data("train"), ImageDataset.get_data("train", transform=False)
     dev_dataset, dev_dataset_no_transform = ImageDataset.get_data("dev"), ImageDataset.get_data("dev", transform=False)
     # test_dataset, test_dataset_no_transform = ImageDataset.get_test()
+
     train_dataset_size = len(train_dataset)
 
     x_dev, y_dev = get_single_image_from_dataset(
@@ -122,11 +124,6 @@ def main(args, truth_path, Identity_path, base_path):
         dev_dataset,
         args.batch_size,
         shuffle=False)
-    # fenchel_classifier.load_data(
-    #     "test",
-    #     test_dataset
-    #     args.batch_size,
-    #     shuffle=False)
 
     fenchel_classifier.init_weights(
         n_examples=len(train_dataset),
@@ -175,13 +172,9 @@ def main(args, truth_path, Identity_path, base_path):
         result_true = json.loads(f.read())
     with open (Identity_path, "r") as f:
         result_identity = json.loads(f.read())
-    
-    x = np.array(result_identity['influence'])
-    influence_true = np.array(result_true['influence'])
-    draw_scatter(x, influence_true, 'identity', 'invHessian')
 
-    y_idx_helpful_and_harmful = result_true['helpful'][:10] + result_true['harmful'][:10]
-    draw_scatter(x[y_idx_helpful_and_harmful], influence_true[y_idx_helpful_and_harmful], 'identity', 'invHessian top10', epoch = 0)
+    Plotter = Plotter_IF(train_dataset_no_transform, CLASS_MAP, CLASS_MAP[y_dev.item()], np.array(result_true['influence']), np.array(result_identity['influence']))
+    Plotter.scatter_corr_identity_invHessian()
 
     for epoch in range(args.max_epoch):
         if epoch == 100:
@@ -189,89 +182,40 @@ def main(args, truth_path, Identity_path, base_path):
         if args.reset_pretrain_classification_every_epoch and epoch > 0:
             fenchel_classifier.load_checkpoint_classification(pretrain_ckpt_path)
         fenchel_classifier.train_epoch()
-        result = {}
 
         influences = [0.0 for _ in range(train_dataset_size)]
         # return influence for all trainig point if using hashmap
         if is_influence_model_hashmap:
             influences = influence_model.get_all_influence().cpu().detach().numpy()
-        # TODO compute by batch
         else:
             for i in tqdm(range(train_dataset_size)):
                 x, y = train_dataset[i:i + 1][0], train_dataset[i:i + 1][1]
                 influences[i] = influence_model(x.cuda(), y.cuda()).cpu().item()
-        
-        def save_result(influences, path):
-            influences = np.array(influences)
-            helpful = np.argsort(influences)
-            harmful = helpful[::-1]
-            result["helpful"] = helpful[:500].tolist()
-            result["harmful"] = harmful[:500].tolist()
-            result["influence"] = influences.tolist()
 
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            save_json(result, path)
+        JsonSaver = JsonSaver_IF(base_path, args.influence_model)
+        JsonSaver.save_influence(influences, epoch)
 
-        save_result(influences, os.path.join(base_path, args.influence_model, f"epoch{epoch}.json"))
         if epoch == 0:
-            x = fenchel_classifier.first_iteration_grad.cpu().detach().numpy()
-            corr = draw_scatter(x, influence_true, "first_iter_grad", "invHessian")
-            draw_scatter(x[y_idx_helpful_and_harmful], influence_true[y_idx_helpful_and_harmful], "first_iter_grad", "invHessian top10")
-            save_result(fenchel_classifier.first_iteration_grad.cpu().detach(), 
-                os.path.join(base_path, f"first_iteration_grad.json"))
-            save_json({},os.path.join(base_path, f"first_iteration_grad_lr{args.classification_lr}_epoch{args.max_pretrain_epoch}_corr{corr}.json"))
+            Plotter.first_iter_influences = fenchel_classifier.first_iteration_grad.cpu().detach().numpy()
+            Plotter.scatter_corr_ours_first_iter_grad(influences)
+            JsonSaver.save_first_iter_grad(fenchel_classifier.first_iteration_grad.cpu().detach().numpy())
 
-            wandb.run.summary['y_true x_first_iter'] = corr
+        Plotter.log_weight_stat(fenchel_classifier._weights.cpu().detach().numpy())
+        
+        Plotter.image_helpful_and_harmful_top_nine(influences)
 
-        wandb.log({
-                f'all_{train_dataset_size}_weight_std': torch.std(fenchel_classifier._weights).item(),
-                f'all_{train_dataset_size}_weight_mean': torch.mean(fenchel_classifier._weights).item(),
-                f'all_{train_dataset_size}_weight_mean_abs': torch.mean(torch.abs(fenchel_classifier._weights)).item(),
-            })
+        Plotter.plot_influence(influences)
 
-        helpful = np.argsort(influences)
+        Plotter.plot_weight(fenchel_classifier._weights.cpu().detach().numpy())
 
-        """plot helpful"""
-        top_9_ind = helpful[:9]
-        images, labels = train_dataset_no_transform[top_9_ind]
+        Plotter.log_correlation_ours_invHessian(influences)
 
-        ys = [f"{CLASS_MAP[c]}_{influences[idx]:.2f}" for c, idx in zip(labels, top_9_ind)]
-        plot_nine_images(images, ys, f"helpful_image_for_{CLASS_MAP[y_dev.item()]}")
+        Plotter.log_correlation_ours_invHessian_top_k(influences, k=10)
 
-        """plot harmful"""
-        top_9_ind = helpful[-9:]
-        images, labels = train_dataset_no_transform[top_9_ind]
-
-        ys = [f"{CLASS_MAP[c]}_{influences[idx]:.2f}" for c, idx in zip(labels, top_9_ind)]
-        plot_nine_images(images, ys, f"harmful_image_for_{CLASS_MAP[y_dev.item()]}")
-
-        """plot scatter plot, y is influence and x is id"""
-
-        plot_scatter(list(range(train_dataset_size)), influences, "id", "influence", f"scatter_plot_influence")
-
-        """plot scatter plot, y is weight and x is id"""
-
-        plot_scatter(list(range(train_dataset_size)), fenchel_classifier._weights.cpu().detach().numpy(), "id", "weight", f"scatter_plot_weight")
-
-
-        """plot influence"""
-        x = influences
-        y = result_true['influence']
-        wandb.log({'correlation_ours': round(np.corrcoef(x, y)[0, 1], 3)})
-        wandb.log({'correlation_ours_top10': round(np.corrcoef(x[y_idx_helpful_and_harmful], influence_true[y_idx_helpful_and_harmful])[0, 1], 3)})
-        if epoch % 40 == 0:
-            x = influences
-            draw_scatter(x, influence_true, 'ours', 'invHessian', epoch)
-            draw_scatter(x[y_idx_helpful_and_harmful], influence_true[y_idx_helpful_and_harmful], 'ours', 'invHessian top10', epoch)
-
-            x = influences
-            y = result_identity['influence']
-            draw_scatter(x, y, 'ours', 'identity', epoch)
-
-            y = fenchel_classifier._weights.cpu().detach().numpy()
-            draw_scatter(x, y, 'ours', 'weight', epoch)
-    
-
+        if epoch % 50 == 0:
+            Plotter.scatter_corr_ours_invHessian(influences, epoch)
+            Plotter.scatter_corr_ours_invHessian_top_k(influences, epoch, k = 10)
+            Plotter.scatter_corr_ours_identity(influences, epoch)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

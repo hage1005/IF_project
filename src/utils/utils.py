@@ -197,3 +197,8 @@ def save_json(
     with open(json_path, "w+") as fout:
         json.dump(json_obj, fout, indent=2)
 
+def get_single_from_dataset(dataset, idx):
+    x, y = dataset[idx]
+    x = x.unsqueeze(0)
+    y = torch.LongTensor([y])
+    return x, y

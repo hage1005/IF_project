@@ -41,3 +41,6 @@ normalize_fn_classification: softmax
 normalize_fn_influence: linear
 _num_class: 10 # the maximum number of class
 _ckpt_name: last
+
+compare_with_inv_hessian: True
+compare_with_identity: True

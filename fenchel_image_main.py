@@ -12,9 +12,9 @@ import numpy as np
 import torch
 
 from src.data_utils.index import get_dataset
-from src.utils.utils import save_json
+from src.utils.utils import get_single_from_dataset
 from src.utils.Plotter_IF import Plotter_IF
-from src.utils.JsonSaver_IF import JsonSaver_IF
+from src.utils.Path_IF import Path_IF
 from src.solver.fenchel_solver import FenchelSolver
 from src.modeling.classification_models import get_classification_model
 from src.modeling.influence_models import get_influence_model
@@ -31,20 +31,14 @@ YAMLPath = 'src/config/MNIST/single_test/exp/MNIST_1_100each/test_id_1/fenchel.y
 
 # YAMLPath = 'src/config/cifar10/single_test/default.yaml'
 
-def main(args, truth_path, Identity_path, base_path):
+def main(args):
     # set seed for reproducibility
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
     np.random.seed(args.seed)
     random.seed(args.seed)
     torch.backends.cudnn.deterministic=True
-
-    def get_single_image_from_dataset(dataset, idx):
-        x, y = dataset[idx]
-        x = x.unsqueeze(0)
-        y = torch.LongTensor([y])
-        return x, y
-    
+    Path = Path_IF(args)
     Dataset, dataset_type = get_dataset(args.dataset_name)
 
     class_label_dict = Dataset.get_class_label_dict()
@@ -59,7 +53,7 @@ def main(args, truth_path, Identity_path, base_path):
 
     train_dataset_size = len(train_dataset)
 
-    x_dev, y_dev = get_single_image_from_dataset(
+    x_dev, y_dev = get_single_from_dataset(
         dev_dataset, args.dev_id_num)
 
     wandb.run.summary['test_image'] = wandb.Image(
@@ -106,29 +100,8 @@ def main(args, truth_path, Identity_path, base_path):
         args.influence_weight_decay,
         args.optimizer_influence)
 
-    ckpt_dir = os.path.join("checkpoints/fenchel", args.dataset_name, args.classification_model)
-    os.makedirs(ckpt_dir, exist_ok=True)
-    pretrain_ckpt_path = os.path.join(ckpt_dir,
-    f"epoch{args.max_pretrain_epoch}_lr{args.pretrain_classification_lr}_{args._pretrain_ckpt_name}")
-    if not os.path.exists(pretrain_ckpt_path):
-        fenchel_classifier.get_optimizer_classification_and_scheduler(
-            args.pretrain_classification_lr,
-            args.classification_momentum,
-            args.classification_weight_decay,
-            args.optimizer_classification,
-            args.max_checkpoint_epoch // 5,
-            0.8)
-        for epoch in range(args.max_pretrain_epoch):
-            fenchel_classifier.pretrain_epoch()
-            dev_acc = fenchel_classifier.evaluate('dev')
-            print('Pre-train Epoch {}, dev Acc: {:.4f}'.format(
-                epoch, 100. * dev_acc))
-        fenchel_classifier.save_checkpoint_classification(pretrain_ckpt_path)
-        fenchel_classifier.global_epoch = 0
-
-
     if args.use_pretrain_classification:
-        fenchel_classifier.load_checkpoint_classification(pretrain_ckpt_path)
+        fenchel_classifier.load_checkpoint_classification(Path.pretrain_ckpt_path)
 
     fenchel_classifier.get_optimizer_classification_and_scheduler(
         args.classification_lr,
@@ -138,10 +111,8 @@ def main(args, truth_path, Identity_path, base_path):
         args.max_checkpoint_epoch // 5,
         0.8)
 
-    with open (truth_path, "r") as f:
-        result_true = json.loads(f.read())
-    with open (Identity_path, "r") as f:
-        result_identity = json.loads(f.read())
+    result_true = Path.get_inv_hessian_influences
+    result_identity = Path.get_identity_influences
 
     Plotter = Plotter_IF(train_dataset_no_transform, CLASS_MAP, CLASS_MAP[y_dev.item()], np.array(result_true['influence']), np.array(result_identity['influence']))
     Plotter.scatter_corr_identity_invHessian()
@@ -150,7 +121,7 @@ def main(args, truth_path, Identity_path, base_path):
         if epoch == 100:
             print("stop")
         if args.reset_pretrain_classification_every_epoch and epoch > 0:
-            fenchel_classifier.load_checkpoint_classification(pretrain_ckpt_path)
+            fenchel_classifier.load_checkpoint_classification(Path.pretrain_ckpt_path)
         fenchel_classifier.train_epoch()
 
         influences = [0.0 for _ in range(train_dataset_size)]
@@ -162,13 +133,12 @@ def main(args, truth_path, Identity_path, base_path):
                 x, y = train_dataset[i:i + 1][0], train_dataset[i:i + 1][1]
                 influences[i] = influence_model(x.cuda(), y.cuda()).cpu().item()
 
-        JsonSaver = JsonSaver_IF(base_path, args.influence_model)
-        JsonSaver.save_influence(influences, epoch)
+        Path.save_influence(influences, epoch)
 
         if epoch == 0:
             Plotter.first_iter_influences = fenchel_classifier.first_iteration_grad.cpu().detach().numpy()
             Plotter.scatter_corr_ours_first_iter_grad(influences)
-            JsonSaver.save_first_iter_grad(fenchel_classifier.first_iteration_grad.cpu().detach().numpy())
+            Path.save_first_iter_grad(fenchel_classifier.first_iteration_grad.cpu().detach().numpy())
 
         Plotter.log_weight_stat(fenchel_classifier._weights.cpu().detach().numpy())
 
@@ -207,22 +177,12 @@ if __name__ == "__main__":
             os.environ["CUDA_VISIBLE_DEVICES"] = str(config["_gpu_id"])
 
     args = wandb.config
-    base_path_truth = os.path.join(
-        "outputs",
-        args.dataset_name,
-        args.classification_model,
-        "dev_id_" + str(args.dev_id_num),
-        f"pretrain{args.max_checkpoint_epoch}epoch"
-    )
-    truth_path = os.path.join(base_path_truth, "Percy.json")
-    Identity_path = os.path.join(base_path_truth, "Identity.json")
-    base_path = os.path.join(
-        "outputs",
-        args.dataset_name,
-        args.classification_model,
-        "dev_id_" + str(args.dev_id_num),
-        f"pretrain{args.max_checkpoint_epoch}epoch"
-    )
-    if not os.path.exists(truth_path): #first get the truth and identity hessian
+    Path = Path_IF(args)
+    pretrain_needed_not_found = not os.path.exists(Path.pretrain_ckpt_path) and args.use_pretrain_classification
+    inv_hessian_needed_not_found = not os.path.exists(Path.inv_hessian_json_path) and args.compare_with_inv_hessian
+    identity_needed_not_found = not os.path.exists(Path.identity_json_path) and args.compare_with_identity
+
+    if pretrain_needed_not_found or inv_hessian_needed_not_found or identity_needed_not_found:
         hessian_main(args)
-    main(args, truth_path, Identity_path, base_path)
+
+    main(args)

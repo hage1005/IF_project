@@ -35,14 +35,13 @@ class MnistDataset(GeneralDataset):
         '9',
     ]
 
-    def __init__(self, dev_data_path, classes, num_per_class):
+    def __init__(self, classes, num_per_class):
         label_transform_fn = lambda x: x
         image_transform_fn = transforms.Compose([ 
             transforms.Normalize(
             (0.1307,),(0.3081,))
             ])
         super().__init__(image_transform_fn, label_transform_fn)
-        self.dev_data_path = dev_data_path
         self.num_per_class = num_per_class
         self.classes = classes
 
@@ -64,7 +63,7 @@ class MnistDataset(GeneralDataset):
             torch.stack([torch.tensor(x[1]) for x in train_data_raw_sampled])
     
     def _get_dev_data_raw(self):
-        dev_data_no_transform = FolderDataset(self.dev_data_path)
+        dev_data_no_transform = FolderDataset('data/MNIST/dev/oneClassEach/original_sampled')
         t = transforms.ToTensor()
 
         return torch.stack([t(x[0]) for x in dev_data_no_transform]),\
@@ -77,23 +76,5 @@ class MnistDataset(GeneralDataset):
     def get_class_map(self):
         return self.class_map
 
-    def _subsample_by_classes(self, all_examples, labels, num_per_class=None):
-        if num_per_class is None:
-            return all_examples
-
-        examples = {label: [] for label in labels}
-        for example in all_examples:
-            if example[1] in labels:
-                examples[example[1]].append(example)
-
-        picked_examples = []
-        for label in labels:
-            examples_with_label = examples[label][:num_per_class[label]]
-            picked_examples.extend(examples_with_label)
-
-            print(f'number of examples with label \'{label}\': '
-                f'{len(examples_with_label)}')
-
-        return picked_examples
 
     

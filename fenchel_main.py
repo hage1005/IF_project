@@ -27,6 +27,7 @@ import yaml
 os.chdir('/home/xiaochen/kewen/IF_project')
 # YAMLPath = 'src/config/MNIST/single_test/exp/MNIST_1_100each.yaml'
 YAMLPath = 'src/config/MNIST/single_test/exp/MNIST_1_100each/test_id_1/fenchel.yaml'
+YAMLPath = 'src/config/GMM2D/exp01.yaml'
 # YAMLPath = 'src/config/MNIST/single_test/exp/Cnn.yaml'
 
 # YAMLPath = 'src/config/cifar10/single_test/default.yaml'
@@ -44,7 +45,7 @@ def main(args):
     class_label_dict = Dataset.get_class_label_dict()
     CLASS_MAP = Dataset.get_class_map()
     train_classes = [class_label_dict[c] for c in args.train_classes]
-    ImageDataset = Dataset(args.dev_original_folder, train_classes, args.num_per_class)
+    ImageDataset = Dataset(train_classes, args.num_per_class)
 
 
     train_dataset, train_dataset_no_transform = ImageDataset.get_data("train"), ImageDataset.get_data("train", transform=False)
@@ -111,10 +112,10 @@ def main(args):
         args.max_checkpoint_epoch // 5,
         0.8)
 
-    result_true = Path.get_inv_hessian_influences
-    result_identity = Path.get_identity_influences
+    result_true = Path.get_inv_hessian_influences()
+    result_identity = Path.get_identity_influences()
 
-    Plotter = Plotter_IF(train_dataset_no_transform, CLASS_MAP, CLASS_MAP[y_dev.item()], np.array(result_true['influence']), np.array(result_identity['influence']))
+    Plotter = Plotter_IF(train_dataset_no_transform, CLASS_MAP, CLASS_MAP[y_dev.item()], dataset_type, np.array(result_true['influence']), np.array(result_identity['influence']))
     Plotter.scatter_corr_identity_invHessian()
 
     for epoch in range(args.max_epoch):
@@ -142,8 +143,7 @@ def main(args):
 
         Plotter.log_weight_stat(fenchel_classifier._weights.cpu().detach().numpy())
 
-        if dataset_type == "image":
-            Plotter.image_helpful_and_harmful_top_nine(influences)
+        Plotter.helpful_and_harmful_top_nine(influences)
 
         Plotter.plot_influence(influences)
 

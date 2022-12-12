@@ -1,4 +1,5 @@
 
+from matplotlib.colors import ListedColormap
 import wandb
 import numpy as np
 import matplotlib.pyplot as plt
@@ -32,7 +33,7 @@ def plot_scatter(x, y, x_label, y_label, wandb_msg):
 
 
 class Plotter_IF:
-    def __init__(self, train_dataset, numeric_label_name_map, dev_label, 
+    def __init__(self, train_dataset, numeric_label_name_map, dev_label, data_type,
             true_influences=None, 
             identity_influences=None, 
             first_iter_influences=None
@@ -40,6 +41,7 @@ class Plotter_IF:
         self.train_dataset = train_dataset
         self.numeric_label_name_map = numeric_label_name_map
         self.dev_label = dev_label
+        self.data_type = data_type
         self.true_influences = true_influences
         self.identity_influences = identity_influences
         self.first_iter_influences = first_iter_influences
@@ -49,6 +51,14 @@ class Plotter_IF:
         if true_influences is not None:
             self.true_helpful = np.argsort(true_influences)
             self.true_harmful = self.true_helpful[::-1]
+
+    def helpful_and_harmful_top_nine(self, influences):
+        if self.data_type == 'image':
+            self.image_helpful_and_harmful_top_nine(influences)
+        elif self.data_type == 'GMM2D':
+            self.GMM2D_helpful_and_harmful_top_nine(influences)
+        else:
+            raise NotImplementedError()
 
     def image_helpful_and_harmful_top_nine(self, influences):
         helpful = np.argsort(influences)
@@ -82,14 +92,14 @@ class Plotter_IF:
 
     def log_correlation_ours_invHessian_top_k(self, influences, k):
 
-        top_k_ind = self.true_helpful[:k] + self.true_harmful[:k]
+        top_k_ind = np.append(self.true_helpful[:k], self.true_harmful[:k])
         wandb.log({f"correlation_ours_top{k}": round(np.corrcoef(influences[top_k_ind], self.true_influences[top_k_ind])[0, 1], 3)})
     
     def scatter_corr_ours_invHessian(self, influences, epoch):
         draw_scatter_with_corr(influences, self.true_influences, 'ours', 'invHessian', epoch)
 
     def scatter_corr_ours_invHessian_top_k(self, influences, epoch, k):
-        top_k_ind = self.true_helpful[:k] + self.true_harmful[:k]
+        top_k_ind = np.append(self.true_helpful[:k], self.true_harmful[:k])
         draw_scatter_with_corr(influences[top_k_ind], self.true_influences[top_k_ind], 'ours', f"invHessian top{k}", epoch)
     
     def scatter_corr_ours_identity(self, influences, epoch):
@@ -114,4 +124,36 @@ class Plotter_IF:
 
     def scatter_corr_identity_invHessian(self):
         draw_scatter_with_corr(self.identity_influences, self.true_influences, 'identity', 'invHessian')
+
+    def GMM2D_helpful_and_harmful_top_nine(self, influences):
+        helpful = np.argsort(influences)
+
+        """plot helpful"""
+        top_9_ind = helpful[:9]
+        data, labels = self.train_dataset[top_9_ind]
+
+        x_axis = [x[0].item() for x in data]
+        y_axis = [x[1].item() for x in data]
+        classes_to_name = ['mean(-1,-1)', 'mean(1,1)']
+    
+        colours = ListedColormap(['r', 'b'])
+        scatter = plt.scatter(x_axis, y_axis, c=labels, cmap=colours)
+        plt.legend(handles=scatter.legend_elements()[0], labels=classes_to_name)
+        wandb.log({f"helpful_data_epoch": plt})
+
+        """plot harmful"""
+        top_9_ind = helpful[-9:]
+        data, labels = self.train_dataset[top_9_ind]
+
+        x_axis = [x[0].item() for x in data]
+        y_axis = [x[1].item() for x in data]
+        classes_to_name = ['mean(-1,-1)', 'mean(1,1)']
+
+        colours = ListedColormap(['r', 'b'])
+        scatter = plt.scatter(x_axis, y_axis, c=labels, cmap=colours)
+        plt.legend(handles=scatter.legend_elements()[0], labels=classes_to_name)
+        wandb.log({f"harmful_data_epoch": plt})
+
+        
+
     

@@ -9,7 +9,7 @@ from torchvision import models, transforms
 
 
 # 1 layer cnn for mnist
-def get_classification_model(name, num_class, hidden_size=100):
+def get_classification_model(name, num_class):
     if name == 'Resnet34':
         classification_model = models.resnet34(pretrained=True).to('cuda')
         classification_model.fc = torch.nn.Linear(
@@ -18,11 +18,13 @@ def get_classification_model(name, num_class, hidden_size=100):
     elif name == 'CnnCifar':
         classification_model = CnnCifar(num_class).to('cuda')
     elif name == 'MNIST_1':
-        classification_model = MNIST_1(hidden_size, num_class).to('cuda')
+        classification_model = MNIST_1(100, num_class).to('cuda')
     elif name == 'MNIST_2':
         classification_model = MNIST_2(num_class).to('cuda')
     elif name == 'CnnMnist':
         classification_model = CnnMnist(num_class).to('cuda')
+    elif name == 'Logistic_Regression_2D':
+        classification_model = Logistic_Regression_2D(num_class).to('cuda')
     else:
         raise NotImplementedError()
     return classification_model
@@ -62,13 +64,15 @@ class CnnCifar(nn.Module):
         return x
 
 
-class LogisticRegression(nn.Module):
-    def __init__(self, input_dim, output_dim):
-        super(LogisticRegression, self).__init__()
-        self.linear = torch.nn.Linear(input_dim, output_dim)
+class Logistic_Regression_2D(nn.Module):
+    def __init__(self, output_dim):
+        super(Logistic_Regression_2D, self).__init__()
+        self.output_dim = output_dim
+        self.linear = torch.nn.Linear(2, output_dim)
 
     def forward(self, x):
         outputs = torch.sigmoid(self.linear(x))
+        outputs = outputs.view(-1, self.output_dim)
         return outputs
 
 class MNIST_1(nn.Module):

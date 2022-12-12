@@ -47,7 +47,7 @@ def main(args):
 
     class_label_dict = Dataset.get_class_label_dict()
     train_classes = [class_label_dict[c] for c in args.train_classes]
-    ImageDataset = Dataset(args.dev_original_folder, args.num_per_class)
+    ImageDataset = Dataset(train_classes, args.num_per_class)
 
     classification_model = get_classification_model(args.classification_model, args._num_class)
     
@@ -126,14 +126,14 @@ def main(args):
     if args.compare_with_identity:
         influences_identity = []
         for i in tqdm(range(train_dataset_size)):
-            if_score_identity, if_score_percy = calculate_identity(train_dataset[i][0], train_dataset[i][1], x_dev, y_dev, inv_hessian)
+            if_score_identity = calculate_identity(train_dataset[i][0], train_dataset[i][1], x_dev, y_dev, inv_hessian)
             influences_identity.append(if_score_identity)
 
     if args.compare_with_inv_hessian:
         influences_percy = []
         for i in tqdm(range(train_dataset_size)):
-            if_score_identity, if_score_percy = calculate_percy(train_dataset[i][0], train_dataset[i][1], x_dev, y_dev, inv_hessian)
-            influences_percy.append(if_score_identity)
+            if_score_percy = calculate_percy(train_dataset[i][0], train_dataset[i][1], x_dev, y_dev, inv_hessian)
+            influences_percy.append(if_score_percy)
 
     x = np.array(influences_identity)
     y = np.array(influences_percy)
@@ -141,7 +141,7 @@ def main(args):
 
     Path.save_percy_influence(influences_percy)
 
-    Path.save_identitiy_influence(influences_identity)
+    Path.save_identity_influence(influences_identity)
 
 
 
